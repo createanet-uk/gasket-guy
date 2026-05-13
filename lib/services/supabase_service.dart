@@ -46,6 +46,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:mobile/components/main_navigation_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -155,7 +156,8 @@ class SupabaseService {
 // Logic for Login Redirection
   void handleLoginNavigation(BuildContext context, String role) {
     if (role == 'engineer') {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ReportListPage()));
+      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ReportListPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainNavigationPage()));
     } else {
       // Original Home Page for standard users
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));

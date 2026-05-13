@@ -1578,30 +1578,71 @@ class _ReportListPageState extends State<ReportListPage> {
     }
   }
 
+  // Future<void> _syncMetadata() async {
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //
+  //     // 1. Fetch all required tables
+  //     final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
+  //     final products = await _supabase.from('seal_products').select();
+  //
+  //     // 2. Fetch Fridges and their Seal Relations (including the seal data joined)
+  //     final fridges = await _supabase.from('fridges').select();
+  //
+  //     // This join gets the relation AND the seal product details in one go
+  //     final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
+  //     *,
+  //     seal_products:seal_product_id (*,seal_model_number)
+  //   ''');
+  //
+  //     // 3. Save to Local Storage
+  //     await prefs.setString('local_customers', jsonEncode(profiles));
+  //     await prefs.setString('local_products', jsonEncode(products));
+  //     await prefs.setString('local_fridges', jsonEncode(fridges));
+  //     await prefs.setString('local_fridge_relations', jsonEncode(fridgeRelations));
+  //
+  //     debugPrint("Metadata, Fridges, and Relations Synced Locally.");
+  //   } catch (e) {
+  //     debugPrint("Metadata Sync Error: $e");
+  //   }
+  // }
+
+
   Future<void> _syncMetadata() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final userId = _supabase.auth.currentUser?.id;
 
       // 1. Fetch all required tables
       final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
       final products = await _supabase.from('seal_products').select();
-
-      // 2. Fetch Fridges and their Seal Relations (including the seal data joined)
       final fridges = await _supabase.from('fridges').select();
 
-      // This join gets the relation AND the seal product details in one go
       final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
       *,
       seal_products:seal_product_id (*,seal_model_number)
     ''');
 
-      // 3. Save to Local Storage
+      // --- NEW: Sync current user's specific profile for the Edit Page ---
+      if (userId != null) {
+        final myProfile = await _supabase
+            .from('user_profiles')
+            .select('full_name, phone')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (myProfile != null) {
+          await prefs.setString('current_user_profile', jsonEncode(myProfile));
+        }
+      }
+
+      // 2. Save to Local Storage
       await prefs.setString('local_customers', jsonEncode(profiles));
       await prefs.setString('local_products', jsonEncode(products));
       await prefs.setString('local_fridges', jsonEncode(fridges));
       await prefs.setString('local_fridge_relations', jsonEncode(fridgeRelations));
 
-      debugPrint("Metadata, Fridges, and Relations Synced Locally.");
+      debugPrint("Metadata and User Profile Synced Locally.");
     } catch (e) {
       debugPrint("Metadata Sync Error: $e");
     }
@@ -1653,7 +1694,7 @@ class _ReportListPageState extends State<ReportListPage> {
 
           ],
         ),
-        leading: IconButton(onPressed: _showLogoutDialog, icon: const Icon(Icons.logout, color: AppTheme.error)),
+        // leading: IconButton(onPressed: _showLogoutDialog, icon: const Icon(Icons.logout, color: AppTheme.error)),
         actions: [
           IconButton(onPressed: _startFullSyncProcess, icon: const Icon(Icons.sync)),
         ],

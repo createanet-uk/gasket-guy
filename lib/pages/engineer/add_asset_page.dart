@@ -3079,7 +3079,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                               borderRadius: BorderRadius.circular(8)),
                         ),
                         child: const Text(
-                          "SELECT Seal",
+                          "SELECT SEAL",
                           style: TextStyle(fontSize: 10),
                           textAlign: TextAlign.center,
                         ),

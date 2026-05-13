@@ -228,6 +228,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:mobile/components/main_navigation_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -275,7 +276,9 @@ class _ModelSyncScreenState extends State<ModelSyncScreen> {
 
     if (role == 'engineer') {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (BuildContext context) => const ReportListPage()),
+        // MaterialPageRoute(builder: (BuildContext context) => const ReportListPage()),
+        MaterialPageRoute(builder: (BuildContext context) => const MainNavigationPage()),
+
       );
     } else {
       Navigator.of(context).pushReplacement(
