@@ -1,0 +1,136 @@
+name: iOS TestFlight Release
+
+on:
+  push:
+    branches:
+      - with-firebase
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🧰 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.35.4
+          channel: stable
+
+      - name: 📦 Install Dependencies
+        run: flutter pub get
+
+      - name: 🍎 Install CocoaPods
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      # 🔐 Install Certificate
+      - name: 🔐 Install Apple Certificate
+        run: |
+          echo "$IOS_CERTIFICATE" | base64 --decode > cert.p12
+
+          security create-keychain -p "1234" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "1234" build.keychain
+          security list-keychains -d user -s build.keychain
+
+          security import cert.p12 \
+            -k build.keychain \
+            -P "$IOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list -S apple-tool:,apple: -k "1234" build.keychain
+
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+
+      # 📄 Install Provisioning Profile
+      - name: 📄 Install Provisioning Profile
+        run: |
+          echo "$PROVISIONING_PROFILE" | base64 --decode > profile.mobileprovision
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
+          echo "UUID: $UUID"
+
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+
+          echo "Installed Profiles:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/
+
+        env:
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+
+      # 🎯 Force correct profile ONLY for Runner
+      - name: 🎯 Set Provisioning Profile for Runner
+        run: |
+          echo "PROVISIONING_PROFILE_SPECIFIER=Bafflesol_v2" >> ios/Flutter/Release.xcconfig
+          echo "DEVELOPMENT_TEAM=449L7MXF64" >> ios/Flutter/Release.xcconfig
+
+      # 🔍 Debug Signing
+      - name: 🔍 Debug Signing
+        run: |
+          echo "=== Certificates ==="
+          security find-identity -v -p codesigning
+
+          echo "=== Profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+      # 🔥 Force Firebase plist sync (Clean + Copy)
+      - name: 🔥 Sync GoogleService-Info.plist
+        run: |
+          echo "Cleaning old plist..."
+          rm -f ios/Runner/GoogleService-Info.plist
+      
+          echo "Restoring plist..."
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+      
+          echo "Verifying..."
+          ls -la ios/Runner/GoogleService-Info.plist
+          
+      # 📦 Archive App
+      - name: 📦 Archive App
+        run: |
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath build/Runner.xcarchive \
+            -destination "generic/platform=iOS" \
+            archive \
+            DEVELOPMENT_TEAM=449L7MXF64 \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PRODUCT_BUNDLE_IDENTIFIER=com.outfluence \
+            -allowProvisioningUpdates
+
+      # 📤 Export IPA
+      - name: 📤 Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ios/ipa
+
+      # 📂 Verify IPA
+      - name: 📂 Verify IPA
+        run: ls -R build/ios/ipa
+
+      # 🚀 Upload to TestFlight
+      - name: 🚀 Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: build/ios/ipa/Outfluence.ipa
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+
+      - name: ✅ Done
+        run: echo "Successfully uploaded to TestFlight 🚀"
