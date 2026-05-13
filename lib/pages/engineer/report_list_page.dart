@@ -1488,6 +1488,44 @@ class _ReportListPageState extends State<ReportListPage> {
   // }
 
   // --- 5. AI Model Update Logic (Existing) ---
+  // Future<void> _checkForModelUpdate() async {
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     int? localVer = prefs.getInt('current_model_version');
+  //
+  //     final dynamic remoteRes = await _supabase
+  //         .from('model_versions')
+  //         .select()
+  //         .eq('is_active', true)
+  //         .order('version', ascending: false)
+  //         .limit(1)
+  //         .maybeSingle();
+  //
+  //     if (remoteRes == null) return;
+  //     final int remoteVer = remoteRes['version'] as int;
+  //
+  //     if (localVer != null && localVer >= remoteVer) return;
+  //
+  //     // Check postpone status
+  //     final userId = _supabase.auth.currentUser!.id;
+  //     final dynamic userStatus = await _supabase.from('user_model_status').select().eq('user_id', userId).maybeSingle();
+  //
+  //     bool shouldPrompt = true;
+  //     if (userStatus != null && userStatus['postponed_at'] != null) {
+  //       final DateTime postponedAt = DateTime.parse(userStatus['postponed_at']).toUtc();
+  //       final int hours = userStatus['postpone_hours_requested'] ?? 0;
+  //       if (DateTime.now().toUtc().isBefore(postponedAt.add(Duration(hours: hours)))) {
+  //         shouldPrompt = false;
+  //       }
+  //     }
+  //
+  //     if (shouldPrompt && mounted) _showUpdatePrompt(remoteRes, userStatus);
+  //   } catch (e) {
+  //     debugPrint("Model Check Error: $e");
+  //   }
+  // }
+
+
   Future<void> _checkForModelUpdate() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1503,6 +1541,9 @@ class _ReportListPageState extends State<ReportListPage> {
 
       if (remoteRes == null) return;
       final int remoteVer = remoteRes['version'] as int;
+
+      // --- ADD THIS LINE TO SAVE DATA FOR PROFILE PAGE ---
+      await prefs.setInt('latest_model_version_sync', remoteVer);
 
       if (localVer != null && localVer >= remoteVer) return;
 
@@ -1524,6 +1565,7 @@ class _ReportListPageState extends State<ReportListPage> {
       debugPrint("Model Check Error: $e");
     }
   }
+
 
   void _showUpdatePrompt(dynamic remoteRes, dynamic userStatus) {
     showDialog(
