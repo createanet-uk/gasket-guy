@@ -1,19 +1,12 @@
-# mobile
 
-A new Flutter project.
+# flutter --version
 
-## Getting Started
+'''
 
-This project is a starting point for a Flutter application.
+Flutter 3.41.6 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision db50e20168 (7 weeks ago) • 2026-03-25 16:21:00 -0700
+Engine • hash 5cdd32777948fa7a648fac915f8da7120ac7e97a (revision 425cfb54d0) (1 months
+ago) • 2026-03-25 20:14:42.000Z
+Tools • Dart 3.11.4 • DevTools 2.54.2
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# gasket-guy
-# gasket-guy
-# gasket-guy
+'''
