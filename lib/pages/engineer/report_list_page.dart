@@ -1315,6 +1315,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
+import 'package:mobile/pages/engineer/view_report_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1380,15 +1381,53 @@ class _ReportListPageState extends State<ReportListPage> {
   }
 
   // --- 3. Data Fetching (Filtered by Auth User) ---
+  // Future<void> _refreshData() async {
+  //   try {
+  //     final userId = _supabase.auth.currentUser?.id;
+  //     if (userId == null) return;
+  //
+  //     final dynamic data = await _supabase
+  //         .from('asset_reports')
+  //         .select('*, customer:user_profiles!customer_id(full_name)')
+  //         .eq('engineer_id', userId) // CRITICAL: Show only my reports
+  //         .order('report_date', ascending: false);
+  //
+  //     final List<Map<String, dynamic>> fetchedReports =
+  //     List<Map<String, dynamic>>.from(data as List);
+  //
+  //     if (mounted) {
+  //       setState(() {
+  //         _reports = fetchedReports;
+  //         _isLoading = false;
+  //       });
+  //       await _saveReportsLocally(fetchedReports);
+  //     }
+  //   } catch (e) {
+  //     debugPrint("Fetch Error: $e");
+  //     if (mounted) setState(() => _isLoading = false);
+  //   }
+  // }
+
+
+  // Inside _ReportListPageState in report_list_page.dart
+
   Future<void> _refreshData() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
+      // UPDATE: Fetch full details (fridges and seals) to support offline viewing
       final dynamic data = await _supabase
           .from('asset_reports')
-          .select('*, customer:user_profiles!customer_id(full_name)')
-          .eq('engineer_id', userId) // CRITICAL: Show only my reports
+          .select('''
+          *,
+          customer:user_profiles!customer_id(full_name, email),
+          fridges:assets_report_fridge(
+            *,
+            seals:report_asset_items(*)
+          )
+        ''')
+          .eq('engineer_id', userId)
           .order('report_date', ascending: false);
 
       final List<Map<String, dynamic>> fetchedReports =
@@ -1399,6 +1438,7 @@ class _ReportListPageState extends State<ReportListPage> {
           _reports = fetchedReports;
           _isLoading = false;
         });
+        // This now saves the FULL details of all reports locally
         await _saveReportsLocally(fetchedReports);
       }
     } catch (e) {
@@ -1432,19 +1472,19 @@ class _ReportListPageState extends State<ReportListPage> {
     if (mounted) setState(() => _isSyncing = false);
   }
 
-  Future<void> _syncMetadata() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
-      final products = await _supabase.from('seal_products').select();
-
-      await prefs.setString('local_customers', jsonEncode(profiles));
-      await prefs.setString('local_products', jsonEncode(products));
-      debugPrint("Metadata Synced.");
-    } catch (e) {
-      debugPrint("Metadata Sync Error: $e");
-    }
-  }
+  // Future<void> _syncMetadata() async {
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
+  //     final products = await _supabase.from('seal_products').select();
+  //
+  //     await prefs.setString('local_customers', jsonEncode(profiles));
+  //     await prefs.setString('local_products', jsonEncode(products));
+  //     debugPrint("Metadata Synced.");
+  //   } catch (e) {
+  //     debugPrint("Metadata Sync Error: $e");
+  //   }
+  // }
 
   // --- 5. AI Model Update Logic (Existing) ---
   Future<void> _checkForModelUpdate() async {
@@ -1537,6 +1577,35 @@ class _ReportListPageState extends State<ReportListPage> {
     }
   }
 
+  Future<void> _syncMetadata() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Fetch all required tables
+      final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
+      final products = await _supabase.from('seal_products').select();
+
+      // 2. Fetch Fridges and their Seal Relations (including the seal data joined)
+      final fridges = await _supabase.from('fridges').select();
+
+      // This join gets the relation AND the seal product details in one go
+      final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
+      *,
+      seal_products:seal_product_id (*,seal_model_number)
+    ''');
+
+      // 3. Save to Local Storage
+      await prefs.setString('local_customers', jsonEncode(profiles));
+      await prefs.setString('local_products', jsonEncode(products));
+      await prefs.setString('local_fridges', jsonEncode(fridges));
+      await prefs.setString('local_fridge_relations', jsonEncode(fridgeRelations));
+
+      debugPrint("Metadata, Fridges, and Relations Synced Locally.");
+    } catch (e) {
+      debugPrint("Metadata Sync Error: $e");
+    }
+  }
+
   Future<void> _executeDownload(String url, String path) async {
     final client = Client();
     final response = await client.send(Request('GET', Uri.parse(url)));
@@ -1624,61 +1693,71 @@ class _ReportListPageState extends State<ReportListPage> {
     final String title = report['report_title'] ?? "Untitled Report";
     final String customer = (report['customer'] as Map?)?['full_name'] ?? "Unknown Customer";
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              // Status Indicator Bar
-              Container(
-                width: 6,
-                color: status == 'submitted' ? Colors.green : Colors.orange,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
-                          const SizedBox(width: 8),
-                          _buildStatusBadge(status),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.business, size: 14, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(customer, style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
-                        ],
-                      ),
-                      const Divider(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(DateFormat('MMM dd, yyyy').format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          Text(DateFormat('hh:mm a').format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                    ],
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ViewReportPage(reportId: report['id']),
+          ),
+        );
+      },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  // Status Indicator Bar
+                  Container(
+                    width: 6,
+                    color: status == 'submitted' ? Colors.green : Colors.orange,
                   ),
-                ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
+                              const SizedBox(width: 8),
+                              _buildStatusBadge(status),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.business, size: 14, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(customer, style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(DateFormat('MMM dd, yyyy').format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                              Text(DateFormat('hh:mm a').format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
     );
   }
 
