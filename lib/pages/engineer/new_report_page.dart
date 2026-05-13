@@ -2928,7 +2928,7 @@ class LocalAssetEntry {
 }
 
 class IndividualSeal {
-  final String itemName;
+  String itemName;
   bool isIdentified = false;
   String? sealId;
   String? sealName;

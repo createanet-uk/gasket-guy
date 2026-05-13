@@ -1348,6 +1348,7 @@ class _ReportListPageState extends State<ReportListPage> {
     _initializePage();
   }
 
+
   // --- 1. Initialization Logic ---
   Future<void> _initializePage() async {
     // Load local reports first for instant UI
