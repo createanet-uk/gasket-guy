@@ -3,7 +3,7 @@ name: iOS TestFlight Release
 on:
   push:
     branches:
-      - with-firebase
+      - main
 
 jobs:
   build:
@@ -82,19 +82,7 @@ jobs:
 
           echo "=== Profiles ==="
           ls ~/Library/MobileDevice/Provisioning\ Profiles/
-          
-      # 🔥 Force Firebase plist sync (Clean + Copy)
-      - name: 🔥 Sync GoogleService-Info.plist
-        run: |
-          echo "Cleaning old plist..."
-          rm -f ios/Runner/GoogleService-Info.plist
-      
-          echo "Restoring plist..."
-          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
-      
-          echo "Verifying..."
-          ls -la ios/Runner/GoogleService-Info.plist
-          
+
       # 📦 Archive App
       - name: 📦 Archive App
         run: |
