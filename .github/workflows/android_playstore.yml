@@ -3,7 +3,7 @@ name: Android Play Store Release
 on:
   push:
     branches:
-      - with-firebase
+      - main
 
 jobs:
   build:
