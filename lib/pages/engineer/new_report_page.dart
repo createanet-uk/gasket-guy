@@ -2935,6 +2935,13 @@ class IndividualSeal {
   double confidence = 0.0;
   List<File> images = [];
 
+  // --- NEW FIELDS ---
+  double doorHeight = 0.0;
+  double doorWidth = 0.0;
+  double wearPercentage = 0.0; // Slider value 0-100
+  bool needsUrgentReplacement = false;
+  // ------------------
+
   // Variant Fields
   bool isMagnetic = false;
   String? sealType;
@@ -2964,6 +2971,9 @@ class IndividualSeal {
       'brand': TextEditingController(),
       'app': TextEditingController(),
       'desc': TextEditingController(),
+      // New Controllers for Dimensions
+      'height': TextEditingController(),
+      'width': TextEditingController(),
     };
   }
 
@@ -2979,6 +2989,8 @@ class IndividualSeal {
     ctrls['brand']!.text = brand ?? '';
     ctrls['app']!.text = application ?? '';
     ctrls['desc']!.text = description ?? '';
+    ctrls['height']!.text = doorHeight > 0 ? doorHeight.toString() : '';
+    ctrls['width']!.text = doorWidth > 0 ? doorWidth.toString() : '';
   }
 
   void disposeControllers() {
@@ -3331,6 +3343,150 @@ class _NewReportPageState extends State<NewReportPage> {
   //   }
   // }
 
+  // Future<void> _handleSubmitReport() async {
+  //   if (_selectedCustomerId == null || _assets.isEmpty || _titleController.text.trim().isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text("Title, Customer and at least one asset are required.")),
+  //     );
+  //     return;
+  //   }
+  //
+  //   final List<ConnectivityResult> connectivityResult = await (Connectivity().checkConnectivity());
+  //   if (connectivityResult.contains(ConnectivityResult.none)) {
+  //     _showNoInternetDialog();
+  //     return;
+  //   }
+  //
+  //   setState(() => _isSubmitting = true);
+  //   const String bucketName = 'engineer-uploads';
+  //
+  //   try {
+  //     // 1. INSERT REPORT HEADER
+  //     final reportHeader = await _supabase.from('asset_reports').insert({
+  //       'customer_id': _selectedCustomerId,
+  //       'engineer_id': _supabase.auth.currentUser!.id,
+  //       'report_title': _titleController.text.trim(),
+  //       'notes': _reportNotesController.text.trim(),
+  //       'status': 'submitted',
+  //     }).select().single();
+  //
+  //     final String reportId = reportHeader['id'];
+  //
+  //     // 2. LOOP THROUGH ASSETS
+  //     for (var asset in _assets) {
+  //       String? dataPlateUrl;
+  //
+  //       // Upload Data Plate Image
+  //       if (asset.dataPlateImage != null) {
+  //         final String fileName = 'plate_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  //         final String path = 'reports/$reportId/$fileName';
+  //         await _supabase.storage.from(bucketName).upload(path, asset.dataPlateImage!);
+  //         dataPlateUrl = _supabase.storage.from(bucketName).getPublicUrl(path);
+  //       }
+  //
+  //       // --- NEW: AUTO-CORRECT FRIDGES MASTER TABLE ---
+  //       // If we have a fridgeId, ensure the door/drawer counts are correct in the master table
+  //       if (asset.fridgeId != null) {
+  //         await _supabase.from('fridges').update({
+  //           'door_count': asset.doorCount,
+  //           'drawer_count': asset.drawerCount,
+  //           'updated_at': DateTime.now().toIso8601String(),
+  //         }).eq('id', asset.fridgeId!);
+  //       }
+  //
+  //       // 3. INSERT INTO 'assets_report_fridge' (The report snapshot)
+  //       final assetResponse = await _supabase.from('assets_report_fridge').insert({
+  //         'report_id': reportId,
+  //         'fridge_id': asset.fridgeId,
+  //         'area': asset.area,
+  //         'data_plate_url': dataPlateUrl,
+  //         'manufacturer': asset.brand ?? asset.manufacturer,
+  //         'model_no': asset.modelNo,
+  //         'serial_no': asset.serialNo,
+  //         'condition': asset.condition,
+  //         'door_count': asset.doorCount,
+  //         'drawer_count': asset.drawerCount,
+  //         'seals_are_common': asset.sealsAreCommon,
+  //         'engineer_notes': asset.description,
+  //       }).select().single();
+  //
+  //       final String assetId = assetResponse['id'];
+  //
+  //       // 4. LOOP THROUGH INDIVIDUAL SEALS
+  //       for (var sealItem in asset.individualSeals) {
+  //         List<String> sealImageUrls = [];
+  //
+  //         // Upload Seal Images
+  //         for (int i = 0; i < sealItem.images.length; i++) {
+  //           final String fileName = 'seal_${i}_${DateTime.now().microsecondsSinceEpoch}.jpg';
+  //           final String path = 'reports/$reportId/seals/$assetId/$fileName';
+  //           await _supabase.storage.from(bucketName).upload(path, sealItem.images[i]);
+  //           sealImageUrls.add(_supabase.storage.from(bucketName).getPublicUrl(path));
+  //         }
+  //
+  //         // 5. INSERT INTO 'report_asset_items'
+  //         await _supabase.from('report_asset_items').insert({
+  //           'report_asset_id': assetId,
+  //           'item_name': sealItem.itemName,
+  //           'seal_id': sealItem.sealId,
+  //           'is_unknown_seal': sealItem.sealId == null,
+  //           'confidence_score': sealItem.confidence,
+  //           'manual_seal_name': sealItem.sealName,
+  //           'image_urls': sealImageUrls,
+  //           'item_notes': sealItem.description,
+  //           'material': sealItem.material,
+  //           'seal_type': sealItem.sealType,
+  //           'thickness': sealItem.thickness,
+  //           'inner_diameter': sealItem.innerDiameter,
+  //           'outer_diameter': sealItem.outerDiameter,
+  //         });
+  //
+  //         // 6. UPDATE MANY-TO-MANY RELATIONSHIP
+  //         if (sealItem.sealId != null && asset.fridgeId != null) {
+  //           final existingRelation = await _supabase
+  //               .from('fridge_seals_relation')
+  //               .select()
+  //               .eq('fridge_id', asset.fridgeId!)
+  //               .eq('seal_product_id', sealItem.sealId!)
+  //               .eq('location', sealItem.itemName)
+  //               .maybeSingle();
+  //
+  //           if (existingRelation == null) {
+  //             await _supabase.from('fridge_seals_relation').insert({
+  //               'fridge_id': asset.fridgeId,
+  //               'seal_product_id': sealItem.sealId,
+  //               'location': sealItem.itemName,
+  //               'quantity': 1,
+  //               'is_primary': false,
+  //               'confidence_score': sealItem.confidence,
+  //               'matching_notes': "Learned from Report: $reportId",
+  //             });
+  //           }
+  //         }
+  //       }
+  //     }
+  //
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Report submitted and Fridge data updated!"), backgroundColor: Colors.green),
+  //       );
+  //       Navigator.pop(context);
+  //     }
+  //   } catch (e) {
+  //     debugPrint("Submit Error: $e");
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text("Submission Failed: $e"), backgroundColor: Colors.red),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _isSubmitting = false);
+  //   }
+  // }
+
+
+
+
   Future<void> _handleSubmitReport() async {
     if (_selectedCustomerId == null || _assets.isEmpty || _titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3360,11 +3516,11 @@ class _NewReportPageState extends State<NewReportPage> {
 
       final String reportId = reportHeader['id'];
 
-      // 2. LOOP THROUGH ASSETS
+      // 2. LOOP THROUGH FRIDGE ASSETS
       for (var asset in _assets) {
         String? dataPlateUrl;
 
-        // Upload Data Plate Image
+        // Upload Data Plate Image if it exists
         if (asset.dataPlateImage != null) {
           final String fileName = 'plate_${DateTime.now().millisecondsSinceEpoch}.jpg';
           final String path = 'reports/$reportId/$fileName';
@@ -3372,8 +3528,7 @@ class _NewReportPageState extends State<NewReportPage> {
           dataPlateUrl = _supabase.storage.from(bucketName).getPublicUrl(path);
         }
 
-        // --- NEW: AUTO-CORRECT FRIDGES MASTER TABLE ---
-        // If we have a fridgeId, ensure the door/drawer counts are correct in the master table
+        // AUTO-CORRECT FRIDGES MASTER QUANTITIES
         if (asset.fridgeId != null) {
           await _supabase.from('fridges').update({
             'door_count': asset.doorCount,
@@ -3382,7 +3537,7 @@ class _NewReportPageState extends State<NewReportPage> {
           }).eq('id', asset.fridgeId!);
         }
 
-        // 3. INSERT INTO 'assets_report_fridge' (The report snapshot)
+        // 3. INSERT SNAPSHOT INTO 'assets_report_fridge' (Report Snapshot)
         final assetResponse = await _supabase.from('assets_report_fridge').insert({
           'report_id': reportId,
           'fridge_id': asset.fridgeId,
@@ -3400,11 +3555,12 @@ class _NewReportPageState extends State<NewReportPage> {
 
         final String assetId = assetResponse['id'];
 
-        // 4. LOOP THROUGH INDIVIDUAL SEALS
-        for (var sealItem in asset.individualSeals) {
+        // 4. LOOP THROUGH INDIVIDUAL SEALS ON THIS ASSET
+        for (int index = 0; index < asset.individualSeals.length; index++) {
+          var sealItem = asset.individualSeals[index];
           List<String> sealImageUrls = [];
 
-          // Upload Seal Images
+          // Upload Multiple Seal Images
           for (int i = 0; i < sealItem.images.length; i++) {
             final String fileName = 'seal_${i}_${DateTime.now().microsecondsSinceEpoch}.jpg';
             final String path = 'reports/$reportId/seals/$assetId/$fileName';
@@ -3412,7 +3568,7 @@ class _NewReportPageState extends State<NewReportPage> {
             sealImageUrls.add(_supabase.storage.from(bucketName).getPublicUrl(path));
           }
 
-          // 5. INSERT INTO 'report_asset_items'
+          // 5. INSERT SNAPSHOT INTO 'report_asset_items' (Includes Wear & Replacement metrics)
           await _supabase.from('report_asset_items').insert({
             'report_asset_id': assetId,
             'item_name': sealItem.itemName,
@@ -3427,9 +3583,50 @@ class _NewReportPageState extends State<NewReportPage> {
             'thickness': sealItem.thickness,
             'inner_diameter': sealItem.innerDiameter,
             'outer_diameter': sealItem.outerDiameter,
+            // Updated custom data parameters
+            'wear_percentage': sealItem.wearPercentage.toInt(),
+            'need_replacement': sealItem.needsUrgentReplacement,
           });
 
-          // 6. UPDATE MANY-TO-MANY RELATIONSHIP
+          // 6. UPSERT DATA INTO MASTER 'fridge_components' TABLE & GET THE COMPONENT UUID
+          String? componentUuid;
+
+          if (asset.fridgeId != null) {
+            final String componentType = sealItem.itemName.toLowerCase().contains('drawer') ? 'drawer' : 'door';
+
+            // Check if this component position configuration index already exists for this fridge
+            final existingComp = await _supabase
+                .from('fridge_components')
+                .select()
+                .eq('fridge_id', asset.fridgeId!)
+                .eq('component_type', componentType)
+                .eq('component_index', index + 1)
+                .maybeSingle();
+
+            if (existingComp == null) {
+              // Record doesn't exist -> Insert fresh and select its generated ID back
+              final newComp = await _supabase.from('fridge_components').insert({
+                'fridge_id': asset.fridgeId,
+                'component_type': componentType,
+                'component_index': index + 1,
+                'width_mm': sealItem.doorWidth,
+                'height_mm': sealItem.doorHeight,
+                'notes': 'Learned from component field logic.',
+              }).select('id').single();
+
+              componentUuid = newComp['id'];
+            } else {
+              // Record exists -> Update measurements and fetch its existing ID back
+              final updatedComp = await _supabase.from('fridge_components').update({
+                'width_mm': sealItem.doorWidth,
+                'height_mm': sealItem.doorHeight,
+              }).eq('id', existingComp['id']).select('id').single();
+
+              componentUuid = updatedComp['id'];
+            }
+          }
+
+          // 7. SYNC MANY-TO-MANY RELATIONSHIP WITH COMPONENTS LINKED INSIDE ARRAY
           if (sealItem.sealId != null && asset.fridgeId != null) {
             final existingRelation = await _supabase
                 .from('fridge_seals_relation')
@@ -3439,15 +3636,53 @@ class _NewReportPageState extends State<NewReportPage> {
                 .eq('location', sealItem.itemName)
                 .maybeSingle();
 
-            if (existingRelation == null) {
+            List<String> currentComponentIds = [];
+
+            if (existingRelation != null) {
+              // Existing Relation Found -> Pull current linked array elements
+              if (existingRelation['supported_component_ids'] != null) {
+                currentComponentIds = List<String>.from(existingRelation['supported_component_ids']);
+              }
+
+              // Append component token to unique listing array cleanly
+              if (componentUuid != null && !currentComponentIds.contains(componentUuid)) {
+                currentComponentIds.add(componentUuid);
+              }
+
+              // Save back the updated component linkage safely
+              await _supabase.from('fridge_seals_relation').update({
+                'supported_component_ids': currentComponentIds,
+                'updated_at': DateTime.now().toIso8601String(),
+              }).eq('id', existingRelation['id']);
+
+            } else {
+              // No Relation Found -> Create completely new relationship mapping layout row
+              if (componentUuid != null) {
+                currentComponentIds.add(componentUuid);
+              }
+
+              // await _supabase.from('fridge_seals_relation').insert({
+              //   'fridge_id': asset.fridgeId,
+              //   'seal_product_id': sealItem.sealId,
+              //   'location': sealItem.itemName,
+              //   'supported_component_ids': currentComponentIds,
+              //   'quantity': 1,
+              //   'is_primary': false,
+              //   'confidence_score': sealItem.confidence,
+              //   'matching_notes': "Learned and relational linked via component index from Report: $reportId",
+              //   'suggested_by_user_id': _supabase.auth.currentUser!.id,
+              // });
+
+              //  TO THIS (Correct Fixed Code)
               await _supabase.from('fridge_seals_relation').insert({
                 'fridge_id': asset.fridgeId,
                 'seal_product_id': sealItem.sealId,
                 'location': sealItem.itemName,
-                'quantity': 1,
-                'is_primary': false,
+                'supported_component_ids': currentComponentIds,
+                'is_verified': false, // ✅ FIXED: Changed to match your database schema column
                 'confidence_score': sealItem.confidence,
-                'matching_notes': "Learned from Report: $reportId",
+                'matching_notes': "Learned and relational linked via component index from Report: $reportId",
+                'suggested_by_user_id': _supabase.auth.currentUser!.id,
               });
             }
           }
@@ -3456,7 +3691,7 @@ class _NewReportPageState extends State<NewReportPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Report submitted and Fridge data updated!"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Report metrics, wear states, and dimensions saved!"), backgroundColor: Colors.green),
         );
         Navigator.pop(context);
       }
@@ -3471,6 +3706,7 @@ class _NewReportPageState extends State<NewReportPage> {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
+
 
   void _showNoInternetDialog() {
     showDialog(

@@ -101,6 +101,98 @@ class _AuthPageState extends State<AuthPage> {
   //   }
   // }
 
+  // void _showBannedDialog() {
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false, // User must acknowledge
+  //     builder: (context) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: Row(
+  //         children: [
+  //           Icon(Icons.report_problem_rounded, color: Colors.red[700], size: 28),
+  //           const SizedBox(width: 10),
+  //           const Text("Access Denied"),
+  //         ],
+  //       ),
+  //       content: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           const Text(
+  //             "Your account has been deactivated by the Administrator.",
+  //             style: TextStyle(fontWeight: FontWeight.bold),
+  //           ),
+  //           const SizedBox(height: 12),
+  //           const Text(
+  //             "If you believe this is a mistake or would like to request an appeal, please contact your regional supervisor or system admin.",
+  //             style: TextStyle(color: Colors.grey, fontSize: 13),
+  //           ),
+  //         ],
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text("UNDERSTOOD", style: TextStyle(fontWeight: FontWeight.bold)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  void _showBannedDialog({String? banEndDate}) {
+    // Format the message based on whether we have a date or if it's permanent
+    String durationMessage = banEndDate != null
+        ? "This suspension is active until: $banEndDate"
+        : "This is a permanent deactivation.";
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_person_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 10),
+            Text("Account Banned"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "An Administrator has restricted your access to the Gasket Guy platform.",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                durationMessage,
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "If you believe this is an error, please reach out to system support.",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CLOSE"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleAuth() async {
     // Basic validation
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -151,7 +243,8 @@ class _AuthPageState extends State<AuthPage> {
         if (response.session != null && mounted) {
           final SharedPreferences prefs = await SharedPreferences.getInstance();
 
-          await prefs.setString('is_user_logged_in', response.session?.accessToken ?? '');
+          await prefs.setString(
+              'is_user_logged_in', response.session?.accessToken ?? '');
           // 1. Fetch the user's role from the user_profiles table
           // We use the authService instance you defined in supabase_service.dart
           final String? role = await _service.getUserRole();
@@ -166,12 +259,20 @@ class _AuthPageState extends State<AuthPage> {
     } catch (e) {
       if (mounted) {
         debugPrint('Auth Error: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception:', '').trim()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+
+        // Check if the error is specifically a Banned User error from Supabase
+        if (e is AuthApiException && e.code == 'user_banned') {
+          _showBannedDialog();
+        } else {
+          // Standard error handling for other cases (wrong password, etc.)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception:', '').trim()),
+              backgroundColor: AppTheme.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
