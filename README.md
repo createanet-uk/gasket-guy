@@ -1,3 +1,8 @@
+# Status
+
+[![Android Play Store Release though CICD](https://github.com/createanet-uk/gasket-guy/actions/workflows/android_playstore.yml/badge.svg)](https://github.com/createanet-uk/gasket-guy/actions/workflows/android_playstore.yml)
+
+
 
 # flutter --version
 
@@ -11,5 +16,5 @@ Tools • Dart 3.11.4 • DevTools 2.54.2
 
 '''
 
-
-https://chatgpt.com/share/6a0489e7-276c-8321-ad3c-14fe4145c522
+# Keys
+- https://chatgpt.com/share/6a0489e7-276c-8321-ad3c-14fe4145c522
