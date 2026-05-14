@@ -96,7 +96,7 @@ jobs:
             DEVELOPMENT_TEAM=449L7MXF64 \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PRODUCT_BUNDLE_IDENTIFIER=com.outfluence \
+            PRODUCT_BUNDLE_IDENTIFIER=uk.co.createanet.gasketguy \
             -allowProvisioningUpdates
 
       # 📤 Export IPA
