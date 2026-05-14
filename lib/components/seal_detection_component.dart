@@ -1422,6 +1422,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
+import '../vision/rubber_camera_detector.dart';
 import 'image_previewer.dart';
 
 /// --- DATA MODELS (Top level to prevent lookup errors) ---
@@ -1592,27 +1593,127 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
     ));
   }
 
-  void _addImage(ImageSource source) async {
+  // void _addImage(ImageSource source) async {
+  //   final picker = ImagePicker();
+  //   if (source == ImageSource.gallery) {
+  //     final List<XFile> picked = await picker.pickMultiImage();
+  //     if (picked.isNotEmpty) {
+  //       setState(() {
+  //         imageFiles.addAll(picked.map((x) => File(x.path)));
+  //         if (imageFiles.length > maxImageLimit) imageFiles = imageFiles.sublist(0, maxImageLimit);
+  //         _resetStatus();
+  //       });
+  //     }
+  //   } else {
+  //     final XFile? picked = await picker.pickImage(source: source);
+  //     if (picked != null) {
+  //       setState(() {
+  //         imageFiles.add(File(picked.path));
+  //         _resetStatus();
+  //       });
+  //     }
+  //   }
+  // }
+
+  Future<void> addImage(ImageSource source) async {
+    if (imageFiles.length >= maxImageLimit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Maximum 5 images are allowed.")),
+      );
+      return;
+    }
+
     final picker = ImagePicker();
+
     if (source == ImageSource.gallery) {
-      final List<XFile> picked = await picker.pickMultiImage();
-      if (picked.isNotEmpty) {
+      try {
+        int remainingSlots = maxImageLimit - imageFiles.length;
+        final List<XFile> pickedFiles = await picker.pickMultiImage();
+
+        if (pickedFiles.isEmpty) return;
+
         setState(() {
-          imageFiles.addAll(picked.map((x) => File(x.path)));
-          if (imageFiles.length > maxImageLimit) imageFiles = imageFiles.sublist(0, maxImageLimit);
-          _resetStatus();
+          if (pickedFiles.length > remainingSlots) {
+            _showLimitWarning(pickedFiles.length, remainingSlots);
+          }
+
+          var filesToAdd = pickedFiles
+              .take(remainingSlots)
+              .map((xFile) => File(xFile.path));
+          imageFiles.addAll(filesToAdd);
+
+          isUnmatched = false;
+          topPredictions = [];
+          statusMessage = "${imageFiles.length} profiles ready for analysis";
         });
+      } catch (e) {
+        debugPrint("Gallery error: $e");
       }
     } else {
-      final XFile? picked = await picker.pickImage(source: source);
-      if (picked != null) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const RubberCameraDetectorPage(),
+        ),
+      );
+
+      if (result == null) return;
+
+      List<File> newFiles = [];
+      if (result is List) {
+        for (var item in result) {
+          if (item is Map && item['path'] != null) {
+            newFiles.add(File(item['path'].toString()));
+          }
+        }
+      } else if (result is File) {
+        newFiles.add(result);
+      } else if (result is String) {
+        newFiles.add(File(result));
+      } else if (result is Map && result['path'] != null) {
+        newFiles.add(File(result['path'].toString()));
+      }
+
+      if (newFiles.isNotEmpty) {
         setState(() {
-          imageFiles.add(File(picked.path));
-          _resetStatus();
+          int remainingSlots = maxImageLimit - imageFiles.length;
+          if (newFiles.length > remainingSlots) {
+            _showLimitWarning(newFiles.length, remainingSlots);
+          }
+
+          imageFiles.addAll(newFiles.take(remainingSlots));
+          isUnmatched = false;
+          topPredictions = [];
+          statusMessage = "${imageFiles.length} profiles ready for analysis";
         });
       }
     }
   }
+
+  void _showLimitWarning(int attempted, int allowed) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 10),
+            Text("Limit Warning"),
+          ],
+        ),
+        content: Text(
+          "You selected $attempted images, but only $allowed slots are available (Max: 5).",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Okay"),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _resetStatus() {
     isUnmatched = false;
@@ -1876,7 +1977,7 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
                 child: _actionButton(
                   icon: Icons.camera_alt_rounded,
                   label: "Camera",
-                  onPressed: () => _addImage(ImageSource.camera),
+                  onPressed: () => addImage(ImageSource.camera),
                   isPrimary: false,
                 ),
               ),
@@ -1885,7 +1986,7 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
                 child: _actionButton(
                   icon: Icons.photo_library_rounded,
                   label: "Gallery",
-                  onPressed: () => _addImage(ImageSource.gallery),
+                  onPressed: () => addImage(ImageSource.gallery),
                   isPrimary: false,
                 ),
               ),

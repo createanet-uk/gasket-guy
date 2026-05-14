@@ -35,13 +35,31 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
+//    signingConfigs {
+//        create("release") {
+//            keyAlias = keystoreProperties["keyAlias"] as String
+//            keyPassword = keystoreProperties["keyPassword"] as String
+//            storeFile = file(keystoreProperties["storeFile"] as String)
+//            storePassword = keystoreProperties["storePassword"] as String
+//        }
+//    }
+
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
+            // Using "toString()" instead of "as String" prevents the null cast crash
+            keyAlias = keystoreProperties["keyAlias"]?.toString()
+            keyPassword = keystoreProperties["keyPassword"]?.toString()
+
+            val storeFilePath = keystoreProperties["storeFile"]?.toString()
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+            }
+
+            storePassword = keystoreProperties["storePassword"]?.toString()
         }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     buildTypes {
         release {

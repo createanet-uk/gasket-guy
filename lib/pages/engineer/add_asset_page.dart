@@ -1862,14 +1862,88 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
 
 // Logic to populate the spec fields (Section 4 in image 1000166586.jpg)
+//   void _autoFillFromSelectedProduct(Map<String, dynamic> p, int index) {
+//     setState(() {
+//       var item = _entry.individualSeals[index];
+//       item.isIdentified = true;
+//       item.sealId = p['id'].toString();
+//       item.sealName = p['title'];
+//
+//       // Technical Data Auto-Fill
+//       item.sealType = p['seal_type'] ?? '';
+//       item.material = p['material'] ?? '';
+//       item.hardness = p['hardness'] ?? '';
+//       item.innerDiameter = (p['inner_diameter'] ?? 0).toDouble();
+//       item.outerDiameter = (p['outer_diameter'] ?? 0).toDouble();
+//       item.thickness = (p['thickness'] ?? 0).toDouble();
+//       item.sealModelNumber = p['seal_model_number'] ?? '';
+//       item.brand = p['brand'] ?? '';
+//
+//       item.updateControllers(); // Pushes data to TextFields
+//     });
+//   }
+
+
+
+  // void _autoFillFromSelectedProduct(Map<String, dynamic> p, int index) {
+  //   setState(() {
+  //     var item = _entry.individualSeals[index];
+  //
+  //     // --- NEW LOGIC: CLEAR PREVIOUS DATA ---
+  //     // If the user selects a new seal manually, we clear images
+  //     // because the previous photos belong to a different/unidentified seal.
+  //     if (item.images.isNotEmpty) {
+  //       item.images = []; // Clear the local File list
+  //       item.confidence = 0.0; // Reset confidence as it's now a manual selection
+  //
+  //       // If this was a common seal, also clear the entry's main image reference
+  //       if (_entry.sealsAreCommon) {
+  //         _entry.sealImage = null;
+  //       }
+  //     }
+  //
+  //     item.isIdentified = true;
+  //     item.sealId = p['id'].toString();
+  //     item.sealName = p['title'];
+  //
+  //     // Technical Data Auto-Fill
+  //     item.sealType = p['seal_type'] ?? '';
+  //     item.material = p['material'] ?? '';
+  //     item.hardness = p['hardness'] ?? '';
+  //     item.innerDiameter = (p['inner_diameter'] ?? 0).toDouble();
+  //     item.outerDiameter = (p['outer_diameter'] ?? 0).toDouble();
+  //     item.thickness = (p['thickness'] ?? 0).toDouble();
+  //     item.sealModelNumber = p['seal_model_number'] ?? '';
+  //     item.brand = p['brand'] ?? '';
+  //
+  //     item.updateControllers(); // Pushes data to TextFields
+  //   });
+  //
+  //   // Optional: Show a quick toast/snack to inform the user
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(
+  //       content: Text("Model selected. Previous scan images cleared."),
+  //       duration: Duration(seconds: 2),
+  //     ),
+  //   );
+  // }
+
   void _autoFillFromSelectedProduct(Map<String, dynamic> p, int index) {
     setState(() {
       var item = _entry.individualSeals[index];
+
+      // Clear previous images/data because this is a new manual selection
+      if (item.images.isNotEmpty) {
+        item.images = [];
+        item.confidence = 0.0;
+        if (_entry.sealsAreCommon) {
+          _entry.sealImage = null;
+        }
+      }
+
       item.isIdentified = true;
       item.sealId = p['id'].toString();
-      item.sealName = p['title'];
-
-      // Technical Data Auto-Fill
+      item.sealName = p['title'] ?? '';
       item.sealType = p['seal_type'] ?? '';
       item.material = p['material'] ?? '';
       item.hardness = p['hardness'] ?? '';
@@ -1878,10 +1952,18 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
       item.thickness = (p['thickness'] ?? 0).toDouble();
       item.sealModelNumber = p['seal_model_number'] ?? '';
       item.brand = p['brand'] ?? '';
-
-      item.updateControllers(); // Pushes data to TextFields
+      item.tempRange = p['temperature_range'] ?? '';
+      item.application = p['application'] ?? '';
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Model selected. Previous scan images cleared."),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
+
 
   Future<void> _loadLocalProducts() async {
     try {
@@ -2988,168 +3070,690 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
 
 
+  // Widget _buildItemVariantCard(int index, IndividualSeal item) {
+  //   return Card(
+  //     elevation: 0,
+  //     margin: const EdgeInsets.only(bottom: 24),
+  //     color: item.isIdentified ? Colors.green[50]!.withOpacity(0.3) : Colors.grey[50],
+  //     shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(12),
+  //         side: BorderSide(color: Colors.grey[200]!)),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16.0),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           // Header Row: Status Icon and Item Name
+  //           Row(children: [
+  //             Icon(
+  //                 item.isIdentified ? Icons.check_circle : Icons.qr_code_scanner,
+  //                 color: item.isIdentified ? Colors.green : Colors.grey),
+  //             const SizedBox(width: 8),
+  //             Text(item.itemName,
+  //                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+  //             const Spacer(),
+  //             if (item.isIdentified)
+  //               Text("${(item.confidence * 100).toStringAsFixed(0)}% Match",
+  //                   style: const TextStyle(fontSize: 10, color: Colors.green)),
+  //           ]),
+  //
+  //           // Image Gallery Section
+  //           if (item.images.isNotEmpty) ...[
+  //             const SizedBox(height: 12),
+  //             SizedBox(
+  //               height: 80,
+  //               child: ListView.builder(
+  //                 scrollDirection: Axis.horizontal,
+  //                 shrinkWrap: true,
+  //                 physics: const ClampingScrollPhysics(),
+  //                 itemCount: item.images.length,
+  //                 itemBuilder: (c, i) => Padding(
+  //                   padding: const EdgeInsets.only(right: 8),
+  //                   child: ImagePreviewer(
+  //                     file: item.images[i],
+  //                     galleryItems: item.images, // Support swiping through all images
+  //                     initialIndex: i,           // Open tapped image first
+  //                     width: 80,
+  //                     height: 80,
+  //                     fit: BoxFit.cover,
+  //                     borderRadius: BorderRadius.circular(8),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           ],
+  //           const SizedBox(height: 16),
+  //
+  //           // FIXED ACTION ROW: Prevents infinite width crash
+  //           Row(
+  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //             children: [
+  //               Expanded(
+  //                 child: Text(
+  //                   item.isIdentified
+  //                       ? "Model: ${item.sealModelNumber}"
+  //                       : "Model Not Selected",
+  //                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+  //                   overflow: TextOverflow.ellipsis,
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 8),
+  //               Row(
+  //                 mainAxisSize: MainAxisSize.min,
+  //                 children: [
+  //                   IconButton(
+  //                     onPressed: () => _showSealDetection(index),
+  //                     icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primary),
+  //                     visualDensity: VisualDensity.compact,
+  //                     tooltip: "Scan with AI",
+  //                   ),
+  //                   const SizedBox(width: 4),
+  //                   ConstrainedBox(
+  //                     constraints: const BoxConstraints(maxWidth: 120),
+  //                     child: ElevatedButton(
+  //                       onPressed: () => _showProductSearch(index),
+  //                       style: ElevatedButton.styleFrom(
+  //                         padding: const EdgeInsets.symmetric(horizontal: 8),
+  //                         visualDensity: VisualDensity.compact,
+  //                         backgroundColor: Colors.blueGrey[800],
+  //                         foregroundColor: Colors.white,
+  //                         shape: RoundedRectangleBorder(
+  //                             borderRadius: BorderRadius.circular(8)),
+  //                       ),
+  //                       child: const Text(
+  //                         "SELECT SEAL",
+  //                         style: TextStyle(fontSize: 10),
+  //                         textAlign: TextAlign.center,
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ],
+  //           ),
+  //
+  //           const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
+  //
+  //           // RESTORED INPUT FIELDS FROM OLD CARD
+  //           _variantInputWidget("Seal Type", item.ctrls['type']!, (v) => item.sealType = v),
+  //           _variantInputWidget("Material", item.ctrls['material']!, (v) => item.material = v),
+  //           _variantInputWidget("Hardness", item.ctrls['hardness']!, (v) => item.hardness = v),
+  //
+  //           // Dimensions Row 1
+  //           Row(children: [
+  //             Expanded(
+  //                 child: _variantInputWidget(
+  //                     "Inner Dia (mm)",
+  //                     item.ctrls['inner']!,
+  //                         (v) => item.innerDiameter = double.tryParse(v.toString()) ?? 0,
+  //                     isNum: true)),
+  //             const SizedBox(width: 10),
+  //             Expanded(
+  //                 child: _variantInputWidget(
+  //                     "Outer Dia (mm)",
+  //                     item.ctrls['outer']!,
+  //                         (v) => item.outerDiameter = double.tryParse(v.toString()) ?? 0,
+  //                     isNum: true)),
+  //           ]),
+  //
+  //           // Dimensions Row 2
+  //           Row(children: [
+  //             Expanded(
+  //                 child: _variantInputWidget(
+  //                     "Thickness (mm)",
+  //                     item.ctrls['thickness']!,
+  //                         (v) => item.thickness = double.tryParse(v.toString()) ?? 0,
+  //                     isNum: true)),
+  //             const SizedBox(width: 10),
+  //             Expanded(
+  //                 child: _variantInputWidget(
+  //                     "Model #",
+  //                     item.ctrls['modelNum']!,
+  //                         (v) => item.sealModelNumber = v)),
+  //           ]),
+  //
+  //           _variantInputWidget("Temperature Range", item.ctrls['temp']!, (v) => item.tempRange = v),
+  //           _variantInputWidget("Brand", item.ctrls['brand']!, (v) => item.brand = v),
+  //           _variantInputWidget("Application", item.ctrls['app']!, (v) => item.application = v),
+  //
+  //           const SizedBox(height: 8),
+  //
+  //           // RESTORED Notes Field
+  //           TextField(
+  //             controller: item.ctrls['desc'],
+  //             maxLines: 2,
+  //             style: const TextStyle(fontSize: 13),
+  //             decoration: const InputDecoration(
+  //                 labelText: "Notes for this seal",
+  //                 border: OutlineInputBorder(),
+  //                 isDense: true),
+  //             onChanged: (val) => item.description = val,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildItemVariantCard(int index, IndividualSeal item) {
+  //   return Card(
+  //     elevation: 0,
+  //     margin: const EdgeInsets.only(bottom: 24),
+  //     color: item.isIdentified ? Colors.green[50]!.withOpacity(0.3) : Colors.grey[50],
+  //     shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(12),
+  //         side: BorderSide(color: Colors.grey[200]!)),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16.0),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           // Header: Status and Item Name
+  //           // Row(children: [
+  //           //   Icon(
+  //           //       item.isIdentified ? Icons.check_circle : Icons.qr_code_scanner,
+  //           //       color: item.isIdentified ? Colors.green : Colors.grey),
+  //           //   const SizedBox(width: 8),
+  //           //   Text(item.itemName,
+  //           //       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+  //           //   const Spacer(),
+  //           //   if (item.isIdentified)
+  //           //     Text("${(item.confidence * 100).toStringAsFixed(0)}% Match",
+  //           //         style: const TextStyle(fontSize: 10, color: Colors.green)
+  //           //     ),
+  //           // ]),
+  //
+  //           //   CLEAN FIX
+  //           Row(children: [
+  //             Icon(
+  //                 item.isIdentified ? Icons.check_circle : Icons.qr_code_scanner,
+  //                 color: item.isIdentified ? Colors.green : Colors.grey),
+  //             const SizedBox(width: 8),
+  //             Text(item.itemName,
+  //                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+  //             const Spacer(),
+  //             // if (item.isIdentified)
+  //             //   Container(
+  //             //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+  //             //     decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(4)),
+  //             //     child: Text("${(item.confidence * 100).toStringAsFixed(0)}% Match",
+  //             //         style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+  //             //   ),
+  //           ]),
+  //
+  //           // Image Gallery
+  //           if (item.images.isNotEmpty) ...[
+  //             const SizedBox(height: 12),
+  //             SizedBox(
+  //               height: 80,
+  //               child: ListView.builder(
+  //                 scrollDirection: Axis.horizontal,
+  //                 shrinkWrap: true,
+  //                 physics: const ClampingScrollPhysics(),
+  //                 itemCount: item.images.length,
+  //                 itemBuilder: (c, i) => Padding(
+  //                   padding: const EdgeInsets.only(right: 8),
+  //                   child: ImagePreviewer(
+  //                     file: item.images[i],
+  //                     galleryItems: item.images,
+  //                     initialIndex: i,
+  //                     width: 80,
+  //                     height: 80,
+  //                     fit: BoxFit.cover,
+  //                     borderRadius: BorderRadius.circular(8),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           ],
+  //           const SizedBox(height: 16),
+  //
+  //           // Selection Action Row
+  //           // Row(
+  //           //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //           //   children: [
+  //           //     Expanded(
+  //           //       child: Text(
+  //           //         item.isIdentified
+  //           //             ? "SKU: ${item.sealModelNumber}"
+  //           //             : "No Model Selected",
+  //           //         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary),
+  //           //         overflow: TextOverflow.ellipsis,
+  //           //       ),
+  //           //     ),
+  //           //     Row(
+  //           //       mainAxisSize: MainAxisSize.min,
+  //           //       children: [
+  //           //         IconButton(
+  //           //           onPressed: () => _showSealDetection(index),
+  //           //           icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primary),
+  //           //           visualDensity: VisualDensity.compact,
+  //           //         ),
+  //           //         const SizedBox(width: 4),
+  //           //         ElevatedButton(
+  //           //           onPressed: () => _showProductSearch(index),
+  //           //           style: ElevatedButton.styleFrom(
+  //           //             backgroundColor: Colors.blueGrey[800],
+  //           //             foregroundColor: Colors.white,
+  //           //             visualDensity: VisualDensity.compact,
+  //           //           ),
+  //           //           child: const Text("SELECT", style: TextStyle(fontSize: 11)),
+  //           //         ),
+  //           //       ],
+  //           //     ),
+  //           //   ],
+  //           // ),
+  //
+  //           //  PASTE THIS FIXED LOGIC SECTION INSTEAD
+  //           Padding(
+  //             padding: const EdgeInsets.symmetric(vertical: 8.0),
+  //             child: Row(
+  //               children: [
+  //                 // 1. Label Section gets exact remaining width safely
+  //                 Expanded(
+  //                   child: Column(
+  //                     crossAxisAlignment: CrossAxisAlignment.start,
+  //                     children: [
+  //                       const Text(
+  //                         "SELECTED MODEL CONFIGURATION",
+  //                         style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+  //                       ),
+  //                       const SizedBox(height: 2),
+  //                       Text(
+  //                         item.isIdentified ? "SKU: ${item.sealModelNumber}" : "No Model Selected",
+  //                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary),
+  //                         overflow: TextOverflow.ellipsis,
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ),
+  //                 const SizedBox(width: 12),
+  //
+  //                 // 2. Clear explicit action boundaries for matching tools
+  //                 IconButton(
+  //                   onPressed: () => _showSealDetection(index),
+  //                   icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primary),
+  //                   tooltip: "Scan with AI",
+  //                 ),
+  //                 const SizedBox(width: 6),
+  //
+  //                 // 3. Constraining button directly blocks horizontal scaling leakage
+  //                 SizedBox(
+  //                   width: 90,
+  //                   child: ElevatedButton(
+  //                     onPressed: () => _showProductSearch(index),
+  //                     style: ElevatedButton.styleFrom(
+  //                       backgroundColor: Colors.blueGrey[800],
+  //                       foregroundColor: Colors.white,
+  //                       padding: EdgeInsets.zero, // Clean fitting for standard small displays
+  //                       visualDensity: VisualDensity.compact,
+  //                     ),
+  //                     child: const Text("SELECT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //
+  //           const Divider(height: 24),
+  //
+  //           // --- DATA DISPLAY SECTION (Fixes Null Safety Errors in image_bbfe41.jpg) ---
+  //           _buildInfoRow("Seal Name", item.sealName ?? "N/A"),
+  //           _buildInfoRow("Seal Type", item.sealType ?? "N/A"),
+  //
+  //           Row(children: [
+  //             Expanded(child: _buildInfoRow("Material", item.material ?? "N/A")),
+  //             Expanded(child: _buildInfoRow("Hardness", item.hardness ?? "N/A")),
+  //           ]),
+  //
+  //           Row(children: [
+  //             Expanded(child: _buildInfoRow("Inner Dia", "${item.innerDiameter ?? 0} mm")),
+  //             Expanded(child: _buildInfoRow("Outer Dia", "${item.outerDiameter ?? 0} mm")),
+  //           ]),
+  //
+  //           Row(children: [
+  //             Expanded(child: _buildInfoRow("Thickness", "${item.thickness ?? 0} mm")),
+  //             Expanded(child: _buildInfoRow("Brand", item.brand ?? "N/A")),
+  //           ]),
+  //
+  //           _buildInfoRow("Temp Range", item.tempRange ?? "N/A"),
+  //           _buildInfoRow("Application", item.application ?? "N/A"),
+  //
+  //           if (item.description != null && item.description!.isNotEmpty) ...[
+  //             const SizedBox(height: 8),
+  //             const Text("Notes:", style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+  //             Text(item.description!, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+  //           ],
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildInfoRow(String label, String value) {
+  //   final String displayValue = value.trim().isEmpty ? "N/A" : value;
+  //
+  //   return Padding(
+  //     padding: const EdgeInsets.only(bottom: 10),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           label.toUpperCase(),
+  //           style: const TextStyle(
+  //             fontSize: 10,
+  //             color: Colors.grey,
+  //             fontWeight: FontWeight.bold,
+  //             letterSpacing: 0.5,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 2),
+  //         Text(
+  //           displayValue,
+  //           style: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w500),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+
+
   Widget _buildItemVariantCard(int index, IndividualSeal item) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 24),
-      color: item.isIdentified ? Colors.green[50]!.withOpacity(0.3) : Colors.grey[50],
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey[200]!)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final bool isReady = item.isIdentified && (item.sealModelNumber?.isNotEmpty ?? false);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Dynamic Theme Mapping
+    final Color statusColor = isReady
+        ? (isDark ? AppTheme.cyberCyan : AppTheme.success)
+        : AppTheme.secondary;
+
+    final Color cardBackground = isDark ? AppTheme.cardBg : AppTheme.secondaryBackground;
+    final Color innerContainerBg = isDark ? AppTheme.innerContainerBg : AppTheme.primaryBackground;
+
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.alternate, width: 1.5),
+        // Shadow explicitly removed here
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
           children: [
-            // Header Row: Status Icon and Item Name
-            Row(children: [
-              Icon(
-                  item.isIdentified ? Icons.check_circle : Icons.qr_code_scanner,
-                  color: item.isIdentified ? Colors.green : Colors.grey),
-              const SizedBox(width: 8),
-              Text(item.itemName,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const Spacer(),
-              if (item.isIdentified)
-                Text("${(item.confidence * 100).toStringAsFixed(0)}% Match",
-                    style: const TextStyle(fontSize: 10, color: Colors.green)),
-            ]),
+            // Dynamic Top Border Identity Line
+            // Positioned(
+            //   top: 0, left: 0, right: 0,
+            //   child: Container(
+            //     height: 3,
+            //     decoration: BoxDecoration(
+            //       gradient: LinearGradient(
+            //         colors: [statusColor, statusColor.withOpacity(0.0)],
+            //         begin: Alignment.centerLeft,
+            //         end: Alignment.centerRight,
+            //       ),
+            //     ),
+            //   ),
+            // ),
 
-            // Image Gallery Section
-            if (item.images.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 80,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  shrinkWrap: true,
-                  physics: const ClampingScrollPhysics(),
-                  itemCount: item.images.length,
-                  itemBuilder: (c, i) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ImagePreviewer(
-                      file: item.images[i],
-                      galleryItems: item.images, // Support swiping through all images
-                      initialIndex: i,           // Open tapped image first
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // FIXED ACTION ROW: Prevents infinite width crash
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    item.isIdentified
-                        ? "Model: ${item.sealModelNumber}"
-                        : "Model Not Selected",
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () => _showSealDetection(index),
-                      icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primary),
-                      visualDensity: VisualDensity.compact,
-                      tooltip: "Scan with AI",
-                    ),
-                    const SizedBox(width: 4),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 120),
-                      child: ElevatedButton(
-                        onPressed: () => _showProductSearch(index),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: Colors.blueGrey[800],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+            Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- HEADER ROW ---
+                  Row(
+                    children: [
+                      Icon(
+                        isReady ? Icons.verified_user_rounded : Icons.radio_button_unchecked_rounded,
+                        color: statusColor,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        item.itemName.toUpperCase(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: isDark ? Colors.white : AppTheme.primaryText,
+                          letterSpacing: 0.7,
                         ),
-                        child: const Text(
-                          "SELECT SEAL",
-                          style: TextStyle(fontSize: 10),
-                          textAlign: TextAlign.center,
+                      ),
+                      const Spacer(),
+                      if (item.isIdentified && item.confidence > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            "${(item.confidence * 100).toStringAsFixed(0)}% AI MATCH",
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: statusColor,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // --- ACTION & SELECTION BAR ---
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: innerContainerBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.alternate.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "MODEL CONFIGURATION",
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                isReady ? "${item.sealModelNumber}" : "Assign Model via Scan / Dropdown",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : AppTheme.primaryText,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // AI Scanner Control
+                        IconButton(
+                          onPressed: () => _showSealDetection(index),
+                          icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary),
+                          tooltip: "AI Identity Scan",
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        const SizedBox(width: 4),
+
+                        // Manual Selector Control
+                        SizedBox(
+                          height: 34,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showProductSearch(index),
+                            icon: const Icon(Icons.unfold_more_rounded, size: 14),
+                            label: const Text("SELECT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDark ? Colors.blueGrey[800] : AppTheme.secondary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: Size.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // --- SCANNED ASSET GALLERY ---
+                  if (item.images.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 64,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: item.images.length,
+                        itemBuilder: (c, i) => Container(
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.alternate),
+                          ),
+                          child: ImagePreviewer(
+                            file: item.images[i],
+                            galleryItems: item.images,
+                            initialIndex: i,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
 
-            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
+                  const SizedBox(height: 16),
+                  Divider(color: isDark ? AppTheme.darkBorder : AppTheme.alternate.withOpacity(0.5), height: 1),
+                  const SizedBox(height: 16),
 
-            // RESTORED INPUT FIELDS FROM OLD CARD
-            _variantInputWidget("Seal Type", item.ctrls['type']!, (v) => item.sealType = v),
-            _variantInputWidget("Material", item.ctrls['material']!, (v) => item.material = v),
-            _variantInputWidget("Hardness", item.ctrls['hardness']!, (v) => item.hardness = v),
+                  // --- GRID SPEC DISPLAY ---
+                  _buildTechSpecGrid(item, isDark),
 
-            // Dimensions Row 1
-            Row(children: [
-              Expanded(
-                  child: _variantInputWidget(
-                      "Inner Dia (mm)",
-                      item.ctrls['inner']!,
-                          (v) => item.innerDiameter = double.tryParse(v.toString()) ?? 0,
-                      isNum: true)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _variantInputWidget(
-                      "Outer Dia (mm)",
-                      item.ctrls['outer']!,
-                          (v) => item.outerDiameter = double.tryParse(v.toString()) ?? 0,
-                      isNum: true)),
-            ]),
-
-            // Dimensions Row 2
-            Row(children: [
-              Expanded(
-                  child: _variantInputWidget(
-                      "Thickness (mm)",
-                      item.ctrls['thickness']!,
-                          (v) => item.thickness = double.tryParse(v.toString()) ?? 0,
-                      isNum: true)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _variantInputWidget(
-                      "Model #",
-                      item.ctrls['modelNum']!,
-                          (v) => item.sealModelNumber = v)),
-            ]),
-
-            _variantInputWidget("Temperature Range", item.ctrls['temp']!, (v) => item.tempRange = v),
-            _variantInputWidget("Brand", item.ctrls['brand']!, (v) => item.brand = v),
-            _variantInputWidget("Application", item.ctrls['app']!, (v) => item.application = v),
-
-            const SizedBox(height: 8),
-
-            // RESTORED Notes Field
-            TextField(
-              controller: item.ctrls['desc'],
-              maxLines: 2,
-              style: const TextStyle(fontSize: 13),
-              decoration: const InputDecoration(
-                  labelText: "Notes for this seal",
-                  border: OutlineInputBorder(),
-                  isDense: true),
-              onChanged: (val) => item.description = val,
+                  // --- CONDITIONAL DESCRIPTIVE NOTES ---
+                  if (item.description != null && item.description!.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: innerContainerBg.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.alternate),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "ENGINEER FIELD NOTES",
+                            style: TextStyle(fontSize: 9, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.description!,
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[300] : AppTheme.primaryText, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTechSpecGrid(IndividualSeal item, bool isDark) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildInfoRow("Seal Name", item.sealName, isDark)),
+            Expanded(child: _buildInfoRow("Seal Type", item.sealType, isDark)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildInfoRow("Material", item.material, isDark)),
+            Expanded(child: _buildInfoRow("Hardness", item.hardness, isDark)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildInfoRow("Inner Dia", item.innerDiameter != null && item.innerDiameter! > 0 ? "${item.innerDiameter} mm" : null, isDark)),
+            Expanded(child: _buildInfoRow("Outer Dia", item.outerDiameter != null && item.outerDiameter! > 0 ? "${item.outerDiameter} mm" : null, isDark)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildInfoRow("Thickness", item.thickness != null && item.thickness! > 0 ? "${item.thickness} mm" : null, isDark)),
+            Expanded(child: _buildInfoRow("Brand Link", item.brand, isDark)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildInfoRow("Temp Range", item.tempRange, isDark)),
+            Expanded(child: _buildInfoRow("Application", item.application, isDark)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String? value, bool isDark) {
+    final String displayValue = (value == null || value.trim().isEmpty || value == "0 mm") ? "—" : value;
+    final bool hasData = displayValue != "—";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 9,
+            color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          displayValue,
+          style: TextStyle(
+            fontSize: 13,
+            color: hasData ? (isDark ? Colors.white : AppTheme.primaryText) : (isDark ? Colors.grey[800] : Colors.grey[400]),
+            fontWeight: hasData ? FontWeight.w500 : FontWeight.normal,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 
