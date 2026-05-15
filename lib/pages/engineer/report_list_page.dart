@@ -1313,6 +1313,7 @@ class _ReportListPageState extends State<ReportListPage> {
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
 import 'package:mobile/pages/engineer/view_report_page.dart';
@@ -1461,18 +1462,62 @@ class _ReportListPageState extends State<ReportListPage> {
   }
 
   Future<void> _startFullSyncProcess() async {
+    // 1. Check connectivity first
+    final List<ConnectivityResult> connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No internet connection. Cannot sync new data."),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSyncing = true;
-      _syncMessage = "Checking for updates...";
+      _syncProgress = 0.1;
+      _syncMessage = "Connecting to server...";
     });
 
-    await _syncMetadata(); // Sync Customers/Products
-    await _refreshData(); // Sync Reports
-    await _checkForModelUpdate(); // Sync AI Model
+    try {
+      // 2. Fetch all metadata (Customers, Products, Fridges, Components, Relations)
+      await _syncMetadata();
+      setState(() => _syncProgress = 0.5);
 
-    if (mounted) setState(() => _isSyncing = false);
+      // 3. Fetch latest reports for this engineer
+      await _refreshData();
+      setState(() => _syncProgress = 0.8);
+
+      // 4. Check for AI Model updates
+      await _checkForModelUpdate();
+      setState(() => _syncProgress = 1.0);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("All data updated successfully!"),
+            backgroundColor: AppTheme.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Sync Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Sync failed: $e"), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncMessage = "";
+        });
+      }
+    }
   }
-
   // Future<void> _syncMetadata() async {
   //   try {
   //     final prefs = await SharedPreferences.getInstance();
@@ -1650,26 +1695,79 @@ class _ReportListPageState extends State<ReportListPage> {
   // }
 
 
+  // Future<void> _syncMetadata() async {
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final userId = _supabase.auth.currentUser?.id;
+  //
+  //     // 1. Fetch all required tables
+  //     final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
+  //     final products = await _supabase.from('seal_products').select();
+  //     final fridges = await _supabase.from('fridges').select();
+  //
+  //     final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
+  //     *,
+  //     seal_products:seal_product_id (*,seal_model_number)
+  //   ''');
+  //
+  //     // --- NEW: Sync current user's specific profile for the Edit Page ---
+  //     if (userId != null) {
+  //       final myProfile = await _supabase
+  //           .from('user_profiles')
+  //           .select('full_name, phone')
+  //           .eq('id', userId)
+  //           .maybeSingle();
+  //
+  //       if (myProfile != null) {
+  //         await prefs.setString('current_user_profile', jsonEncode(myProfile));
+  //       }
+  //     }
+  //
+  //     // 2. Save to Local Storage
+  //     await prefs.setString('local_customers', jsonEncode(profiles));
+  //     await prefs.setString('local_products', jsonEncode(products));
+  //     await prefs.setString('local_fridges', jsonEncode(fridges));
+  //     await prefs.setString('local_fridge_relations', jsonEncode(fridgeRelations));
+  //
+  //     debugPrint("Metadata and User Profile Synced Locally.");
+  //   } catch (e) {
+  //     debugPrint("Metadata Sync Error: $e");
+  //   }
+  // }
+
+
+
   Future<void> _syncMetadata() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = _supabase.auth.currentUser?.id;
 
-      // 1. Fetch all required tables
+      setState(() {
+        _syncMessage = "Syncing Catalogs & Components...";
+      });
+
+      // 1. Fetch User Profiles & Product Catalog
       final profiles = await _supabase.from('user_profiles').select().filter('role', 'in', '("engineer","user")');
       final products = await _supabase.from('seal_products').select();
+
+      // 2. Fetch Fridges Master Data
       final fridges = await _supabase.from('fridges').select();
 
-      final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
-      *,
-      seal_products:seal_product_id (*,seal_model_number)
-    ''');
+      // 3. Fetch Fridge Components (Height, Width for each door/drawer)
+      final components = await _supabase.from('fridge_components').select();
 
-      // --- NEW: Sync current user's specific profile for the Edit Page ---
+      // 4. Fetch Fridge-Seal Relations with Nested Product Info
+      // This allows you to know exactly which seal fits which fridge even while offline
+      final fridgeRelations = await _supabase.from('fridge_seals_relation').select('''
+        *,
+        seal_products:seal_product_id (*)
+      ''');
+
+      // 5. Sync current user's profile for personal settings
       if (userId != null) {
         final myProfile = await _supabase
             .from('user_profiles')
-            .select('full_name, phone')
+            .select('full_name, phone, email, role')
             .eq('id', userId)
             .maybeSingle();
 
@@ -1678,13 +1776,15 @@ class _ReportListPageState extends State<ReportListPage> {
         }
       }
 
-      // 2. Save to Local Storage
+      // 6. Save everything to SharedPreferences
+      // We use clear keys so other pages can access them easily
       await prefs.setString('local_customers', jsonEncode(profiles));
       await prefs.setString('local_products', jsonEncode(products));
       await prefs.setString('local_fridges', jsonEncode(fridges));
+      await prefs.setString('local_fridge_components', jsonEncode(components));
       await prefs.setString('local_fridge_relations', jsonEncode(fridgeRelations));
 
-      debugPrint("Metadata and User Profile Synced Locally.");
+      debugPrint("Full Database Sync Complete: Profiles, Products, Fridges, Components, and Relations.");
     } catch (e) {
       debugPrint("Metadata Sync Error: $e");
     }

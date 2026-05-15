@@ -2888,6 +2888,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme.dart';
 import '../../services/supabase_service.dart';
 import 'add_asset_page.dart';
+import 'edit_asset_page.dart';
 
 class LocalAssetEntry {
   String? fridgeId; // Populated by Edge Function in AddAssetPage
@@ -3809,33 +3810,191 @@ class _NewReportPageState extends State<NewReportPage> {
     );
   }
 
+  // Widget _buildSummaryCard(int index) {
+  //   final asset = _assets[index];
+  //   return Card(
+  //     elevation: 0,
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+  //     margin: const EdgeInsets.only(bottom: 12),
+  //     child: ExpansionTile(
+  //       leading: asset.dataPlateImage != null
+  //           ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(asset.dataPlateImage!, width: 50, height: 50, fit: BoxFit.cover))
+  //           : const Icon(Icons.kitchen, color: AppTheme.primary),
+  //       title: Text(asset.area.isEmpty ? "Unit ${index + 1}" : asset.area, style: const TextStyle(fontWeight: FontWeight.bold)),
+  //       subtitle: Text("Doors: ${asset.doorCount} | Drawers: ${asset.drawerCount}"),
+  //       children: [
+  //         Padding(
+  //           padding: const EdgeInsets.all(12.0),
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: asset.individualSeals.map((s) => Text("• ${s.itemName}: ${s.sealName ?? 'Not Identified'}", style: const TextStyle(fontSize: 12))).toList(),
+  //           ),
+  //         ),
+  //         TextButton.icon(
+  //           onPressed: () => setState(() => _assets.removeAt(index)),
+  //           icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+  //           label: const Text("Remove Appliance", style: TextStyle(color: Colors.red)),
+  //         )
+  //       ],
+  //     ),
+  //   );
+  // }
+
   Widget _buildSummaryCard(int index) {
     final asset = _assets[index];
+
+    // Check if any seal in this fridge asset needs urgent replacement
+    bool anyUrgent = asset.individualSeals.any((s) => s.needsUrgentReplacement);
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: anyUrgent ? AppTheme.error.withOpacity(0.5) : Colors.grey[200]!,
+          width: anyUrgent ? 1.5 : 1,
+        ),
+      ),
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
+        backgroundColor: anyUrgent ? AppTheme.error.withOpacity(0.02) : null,
         leading: asset.dataPlateImage != null
-            ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(asset.dataPlateImage!, width: 50, height: 50, fit: BoxFit.cover))
-            : const Icon(Icons.kitchen, color: AppTheme.primary),
-        title: Text(asset.area.isEmpty ? "Unit ${index + 1}" : asset.area, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("Doors: ${asset.doorCount} | Drawers: ${asset.drawerCount}"),
+            ? ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(asset.dataPlateImage!, width: 50, height: 50, fit: BoxFit.cover),
+        )
+            : Container(
+          width: 50, height: 50,
+          decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.kitchen, color: AppTheme.primary),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                asset.area.isEmpty ? "Unit ${index + 1}" : asset.area,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (anyUrgent)
+              const Icon(Icons.warning_amber_rounded, color: AppTheme.error, size: 18),
+          ],
+        ),
+        subtitle: Text(
+          "Model: ${asset.modelNo} • ${asset.doorCount} Doors / ${asset.drawerCount} Drawers",
+          style: TextStyle(fontSize: 12, color: AppTheme.secondaryText),
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: asset.individualSeals.map((s) => Text("• ${s.itemName}: ${s.sealName ?? 'Not Identified'}", style: const TextStyle(fontSize: 12))).toList(),
+              children: [
+                const Text("COMPONENT DETAILS",
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1, color: AppTheme.secondaryText)),
+                const SizedBox(height: 8),
+                ...asset.individualSeals.map((s) => _buildSealSummaryRow(s)).toList(),
+
+                const Divider(height: 24),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // TextButton.icon(
+                    //   onPressed: () {
+                    //     Navigator.push(
+                    //       context,
+                    //       MaterialPageRoute(
+                    //         builder: (context) => EditAssetPage(
+                    //           asset: asset,
+                    //           onUpdate: (updatedAsset) {
+                    //             setState(() {
+                    //               _assets[index] = updatedAsset; // Overwrite current modified memory index data frame
+                    //             });
+                    //           },
+                    //         ),
+                    //       ),
+                    //     );
+                    //   },
+                    //   icon: const Icon(Icons.edit_rounded, color: AppTheme.primary, size: 18),
+                    //   label: const Text("Edit Details", style: TextStyle(color: AppTheme.primary)),
+                    // ),
+                    // const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _assets.removeAt(index)),
+                      icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
+                      label: const Text("Remove", style: TextStyle(color: AppTheme.error)),
+                    ),
+                  ],
+                )
+              ],
             ),
           ),
-          TextButton.icon(
-            onPressed: () => setState(() => _assets.removeAt(index)),
-            icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-            label: const Text("Remove Appliance", style: TextStyle(color: Colors.red)),
-          )
         ],
       ),
+    );
+  }
+
+  Widget _buildSealSummaryRow(IndividualSeal s) {
+    // Determine Wear Color
+    Color wearColor;
+    if (s.wearPercentage < 30) wearColor = AppTheme.success;
+    else if (s.wearPercentage < 70) wearColor = AppTheme.tertiary;
+    else wearColor = AppTheme.error;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: s.needsUrgentReplacement ? Border.all(color: AppTheme.error.withOpacity(0.3)) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.circle, size: 8, color: wearColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(s.itemName,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+              if (s.needsUrgentReplacement)
+                const Text("URGENT",
+                    style: TextStyle(color: AppTheme.error, fontSize: 10, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              _dataPoint(Icons.straighten, "${s.doorHeight}x${s.doorWidth} mm"),
+              const SizedBox(width: 12),
+              _dataPoint(Icons.speed, "Wear: ${s.wearPercentage.toInt()}%"),
+              const SizedBox(width: 12),
+              Expanded(child: _dataPoint(Icons.qr_code, s.sealName ?? 'Not Linked')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dataPoint(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: AppTheme.secondaryText),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(label,
+            style: TextStyle(fontSize: 11, color: AppTheme.secondaryText),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

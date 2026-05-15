@@ -46,17 +46,19 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile/components/main_navigation_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../common/cm_dialog.dart';
 import '../home_page.dart';
+import '../pages/auth_page.dart';
 import '../pages/engineer/report_list_page.dart';
 
 class SupabaseService {
   final _client = Supabase.instance.client;
-
-
+  bool _isBannedDialogShowing = false;
 
   Future<AuthResponse> signUp({
     required String email,
@@ -72,8 +74,6 @@ class SupabaseService {
       },
     );
   }
-
-
 
   // Sign In
   Future<AuthResponse> signIn(String email, String password) async {
@@ -124,7 +124,7 @@ class SupabaseService {
   }
   // lib/services/supabase_service.dart
 
-// Fetch Seal Products
+  // Fetch Seal Products
   Future<List<Map<String, dynamic>>> fetchSealProducts() async {
     final res = await _client
         .from('seal_products')
@@ -133,7 +133,7 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(res);
   }
 
-// Fetch Customers (already defined, but ensure it's here)
+  // Fetch Customers (already defined, but ensure it's here)
   Future<List<Map<String, dynamic>>> fetchCustomers() async {
     final res = await _client
         .from('user_profiles')
@@ -164,5 +164,70 @@ class SupabaseService {
     }
   }
 
-  Future<void> signOut() async => await _client.auth.signOut();
+  Future<void> signOut(BuildContext context) async {
+    // SharedPreferences p = await SharedPreferences.getInstance();
+    // await p.clear();
+    await _client.auth.signOut();
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const AuthPage()), (r) => false);
+  }
+
+  final Map<String, RealtimeChannel> _realtimeChannels = {};
+
+  Future<void> listenToUserStatus(BuildContext context) async {
+
+    String channelName = 'userProfilesChannel';
+
+    GlobalKey<NavigatorState>? rootNavigatorKey;
+    try {
+      rootNavigatorKey = GoRouter.of(context).routerDelegate.navigatorKey;
+    } catch (e) {
+      debugPrint('Initial navigator key extraction failed: $e');
+    }
+
+    if (_realtimeChannels.containsKey(channelName)) {
+      await _client.removeChannel(_realtimeChannels[channelName]!);
+      _realtimeChannels.remove(channelName);
+    }
+
+    final channel = _client.channel(channelName);
+
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'user_profiles',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: _client.auth.currentUser?.id,
+      ),
+      callback: (payload) async {
+        final newRecord = payload.newRecord;
+        final liveContext = rootNavigatorKey?.currentContext ?? (context.mounted ? context : null);
+
+        if (newRecord['is_active'] == false) {
+          if (!_isBannedDialogShowing && liveContext != null) {
+            _isBannedDialogShowing = true;
+            String reason = newRecord['blocked_reason'] ?? 'No reason provided';
+            debugPrint('Deactivation detected. Reason: $reason');
+
+            await CmDialog.showBannedDialog(
+              liveContext,
+              onPressed: () async => await signOut(liveContext),
+            );
+
+            _isBannedDialogShowing = false;
+          }
+        } else if (newRecord['is_active'] == true) {
+          if (_isBannedDialogShowing && liveContext != null) {
+            debugPrint('User reactivated. Closing banned dialog.');
+            Navigator.of(liveContext).pop();
+            _isBannedDialogShowing = false;
+          }
+        }
+      },
+    );
+
+    await channel.subscribe();
+    _realtimeChannels[channelName] = channel;
+  }
 }

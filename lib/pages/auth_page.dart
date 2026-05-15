@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../common/cm_dialog.dart';
 import '../services/supabase_service.dart';
 import '../theme.dart';
 
@@ -20,6 +21,7 @@ class _AuthPageState extends State<AuthPage> {
 
   bool _isSignUp = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   // Future<void> _handleAuth() async {
   //   if (_emailController.text.isEmpty || _passwordController.text.isEmpty) return;
@@ -138,61 +140,6 @@ class _AuthPageState extends State<AuthPage> {
   //   );
   // }
 
-  void _showBannedDialog({String? banEndDate}) {
-    // Format the message based on whether we have a date or if it's permanent
-    String durationMessage = banEndDate != null
-        ? "This suspension is active until: $banEndDate"
-        : "This is a permanent deactivation.";
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.lock_person_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 10),
-            Text("Account Banned"),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "An Administrator has restricted your access to the Gasket Guy platform.",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                durationMessage,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              "If you believe this is an error, please reach out to system support.",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("CLOSE"),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleAuth() async {
     // Basic validation
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -262,7 +209,7 @@ class _AuthPageState extends State<AuthPage> {
 
         // Check if the error is specifically a Banned User error from Supabase
         if (e is AuthApiException && e.code == 'user_banned') {
-          _showBannedDialog();
+          CmDialog.showBannedDialog(context);
         } else {
           // Standard error handling for other cases (wrong password, etc.)
           ScaffoldMessenger.of(context).showSnackBar(
@@ -325,8 +272,21 @@ class _AuthPageState extends State<AuthPage> {
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Password", prefixIcon: Icon(Icons.lock_outline)),
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(labelText: "Password", prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppTheme.secondaryText,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword; // Toggle visibility state
+                      });
+                    },
+                  ),),
               ),
               const SizedBox(height: 32),
 

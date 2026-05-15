@@ -236,79 +236,396 @@ class _ViewReportPageState extends State<ViewReportPage> {
     );
   }
 
+  // Widget _buildSealItemRow(Map<String, dynamic> seal) {
+  //   final List<dynamic> imageUrls = seal['image_urls'] ?? [];
+  //
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.all(16.0),
+  //         child: Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //               children: [
+  //                 Text(seal['item_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primary)),
+  //                 // SEAL MODEL NUMBER HIGHLIGHT
+  //                 Container(
+  //                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+  //                   decoration: BoxDecoration(
+  //                     color: AppTheme.primary.withOpacity(0.1),
+  //                     borderRadius: BorderRadius.circular(8),
+  //                   ),
+  //                   child: Text(
+  //                     "Model: ${seal['manual_seal_name'] ?? 'Custom'}",
+  //                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 12),
+  //
+  //             // Technical Specs
+  //             Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //               children: [
+  //                 _buildSpecItem("Type", seal['seal_type'] ?? 'N/A'),
+  //                 _buildSpecItem("Material", seal['material'] ?? 'N/A'),
+  //                 _buildSpecItem("Size (mm)", "${seal['inner_diameter']} x ${seal['outer_diameter']}"),
+  //               ],
+  //             ),
+  //
+  //             const SizedBox(height: 16),
+  //             const Text("SEAL PHOTOS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+  //             const SizedBox(height: 8),
+  //
+  //             // Seal Images Logic with Placeholder
+  //             imageUrls.isNotEmpty
+  //                 ? SizedBox(
+  //               height: 110,
+  //               child: ListView.builder(
+  //                 scrollDirection: Axis.horizontal,
+  //                 itemCount: imageUrls.length,
+  //                 itemBuilder: (context, index) => Padding(
+  //                   padding: const EdgeInsets.only(right: 10),
+  //                   child: ImagePreviewer(
+  //                     url: imageUrls[index],
+  //                     // FIX: Use 'imageUrls' instead of 'item.images'
+  //                     galleryItems: imageUrls,
+  //                     initialIndex: index,
+  //                     width: 110,
+  //                     height: 110,
+  //                     fit: BoxFit.cover,
+  //                     borderRadius: BorderRadius.circular(10),
+  //                   ),
+  //                 ),
+  //               ),
+  //             )
+  //                 : _buildImagePlaceholder("No seal photos available for this item", height: 60),
+  //           ],
+  //         ),
+  //       ),
+  //       const Divider(height: 1),
+  //     ],
+  //   );
+  // }
+
+
+
+  // Widget _buildSealItemRow(Map<String, dynamic> seal) {
+  //   final List<dynamic> imageUrls = seal['image_urls'] ?? [];
+  //   final bool needsReplacement = seal['need_replacement'] ?? false;
+  //   final int wear = (seal['wear_percentage'] ?? 0).toInt();
+  //
+  //   // Determine Wear Color for the view page
+  //   Color wearColor;
+  //   if (wear < 30) wearColor = AppTheme.success;
+  //   else if (wear < 70) wearColor = AppTheme.tertiary;
+  //   else wearColor = AppTheme.error;
+  //
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       // Urgent Replacement Banner (Only shows if true)
+  //       if (needsReplacement)
+  //         Container(
+  //           width: double.infinity,
+  //           color: AppTheme.error.withOpacity(0.1),
+  //           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+  //           child: Row(
+  //             children: [
+  //               const Icon(Icons.report_problem_rounded, color: AppTheme.error, size: 14),
+  //               const SizedBox(width: 8),
+  //               const Text(
+  //                 "URGENT REPLACEMENT REQUIRED",
+  //                 style: TextStyle(color: AppTheme.error, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //
+  //       Padding(
+  //         padding: const EdgeInsets.all(16.0),
+  //         child: Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //               children: [
+  //                 Text(seal['item_name'],
+  //                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText)),
+  //                 Container(
+  //                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+  //                   decoration: BoxDecoration(
+  //                     color: AppTheme.primary.withOpacity(0.1),
+  //                     borderRadius: BorderRadius.circular(8),
+  //                   ),
+  //                   child: Text(
+  //                     seal['manual_seal_name'] ?? 'Custom Seal',
+  //                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 16),
+  //
+  //             // Enhanced Data Grid for View Page
+  //             Row(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Expanded(child: _buildSpecItem("Material", seal['material'] ?? 'N/A')),
+  //                 Expanded(child: _buildSpecItem("Type", seal['seal_type'] ?? 'N/A')),
+  //                 Expanded(child: _buildSpecItem("Thickness", "${seal['thickness'] ?? 0}mm")),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 12),
+  //             Row(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 // --- SHOWING NEW DIMENSIONS ---
+  //                 Expanded(child: _buildSpecItem("Dimensions", "${seal['inner_diameter']} x ${seal['outer_diameter']} mm")),
+  //
+  //                 // --- SHOWING WEAR LEVEL ---
+  //                 Expanded(
+  //                   child: Column(
+  //                     crossAxisAlignment: CrossAxisAlignment.start,
+  //                     children: [
+  //                       const Text("Wear Level", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500)),
+  //                       Row(
+  //                         children: [
+  //                           Text("$wear%", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: wearColor)),
+  //                           const SizedBox(width: 4),
+  //                           Icon(Icons.circle, size: 8, color: wearColor),
+  //                         ],
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ),
+  //                 const Expanded(child: SizedBox()), // Spacer to keep 3 column look
+  //               ],
+  //             ),
+  //
+  //             const SizedBox(height: 20),
+  //             const Text("SEAL PHOTOS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+  //             const SizedBox(height: 8),
+  //
+  //             imageUrls.isNotEmpty
+  //                 ? SizedBox(
+  //               height: 110,
+  //               child: ListView.builder(
+  //                 scrollDirection: Axis.horizontal,
+  //                 itemCount: imageUrls.length,
+  //                 itemBuilder: (context, index) => Padding(
+  //                   padding: const EdgeInsets.only(right: 10),
+  //                   child: ImagePreviewer(
+  //                     url: imageUrls[index],
+  //                     galleryItems: imageUrls,
+  //                     initialIndex: index,
+  //                     width: 110,
+  //                     height: 110,
+  //                     fit: BoxFit.cover,
+  //                     borderRadius: BorderRadius.circular(10),
+  //                   ),
+  //                 ),
+  //               ),
+  //             )
+  //                 : _buildImagePlaceholder("No photos provided", height: 60),
+  //
+  //             // Item specific notes if they exist
+  //             if (seal['item_notes'] != null && seal['item_notes'].toString().isNotEmpty) ...[
+  //               const SizedBox(height: 16),
+  //               Container(
+  //                 width: double.infinity,
+  //                 padding: const EdgeInsets.all(12),
+  //                 decoration: BoxDecoration(
+  //                   color: Colors.grey[50],
+  //                   borderRadius: BorderRadius.circular(8),
+  //                   border: Border.all(color: Colors.grey[200]!),
+  //                 ),
+  //                 child: Text(
+  //                   "Note: ${seal['item_notes']}",
+  //                   style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.black87),
+  //                 ),
+  //               ),
+  //             ],
+  //           ],
+  //         ),
+  //       ),
+  //       const Divider(height: 1),
+  //     ],
+  //   );
+  // }
+
+
+
   Widget _buildSealItemRow(Map<String, dynamic> seal) {
     final List<dynamic> imageUrls = seal['image_urls'] ?? [];
+    final bool needsReplacement = seal['need_replacement'] ?? false;
+    final int wear = (seal['wear_percentage'] ?? 0).toInt();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // Color logic
+    Color wearColor;
+    if (wear < 30) wearColor = AppTheme.success;
+    else if (wear < 70) wearColor = AppTheme.tertiary;
+    else wearColor = AppTheme.error;
+
+    return Container(
+      // HIGHLIGHT: Entire container gets a red border if urgent
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: needsReplacement
+            ? Border.all(color: AppTheme.error, width: 2)
+            : Border.all(color: Colors.transparent),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. URGENT TOP BANNER
+          if (needsReplacement)
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: AppTheme.error,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: const Row(
                 children: [
-                  Text(seal['item_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primary)),
-                  // SEAL MODEL NUMBER HIGHLIGHT
+                  Icon(Icons.warning_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    "ACTION REQUIRED: URGENT REPLACEMENT",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 2. HEADER WITH ITEM NAME & BADGE
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            seal['item_name'].toString().toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5)
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "Model: ${seal['manual_seal_name'] ?? 'Custom'}",
+                          style: TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+
+                    // 3. WEAR PERCENTAGE CHIP
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: wearColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: wearColor.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.speed_rounded, size: 14, color: wearColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            "$wear% WEAR",
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: wearColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1),
+                ),
+
+                // 4. TECHNICAL SPECS GRID
+                Row(
+                  children: [
+                    Expanded(child: _buildSpecItem("HEIGHT", "${seal['height_mm'] ?? seal['doorHeight'] ?? 0} mm")),
+                    Expanded(child: _buildSpecItem("WIDTH", "${seal['width_mm'] ?? seal['doorWidth'] ?? 0} mm")),
+                    Expanded(child: _buildSpecItem("THICKNESS", "${seal['thickness'] ?? 0} mm")),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _buildSpecItem("MATERIAL", seal['material'] ?? 'N/A')),
+                    Expanded(child: _buildSpecItem("TYPE", seal['seal_type'] ?? 'N/A')),
+                    const Expanded(child: SizedBox()),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                const Text("CAPTURED PHOTOS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 8),
+
+                // 5. IMAGE GALLERY
+                imageUrls.isNotEmpty
+                    ? SizedBox(
+                  height: 90,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imageUrls.length,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ImagePreviewer(
+                        url: imageUrls[index],
+                        galleryItems: imageUrls,
+                        initialIndex: index,
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                )
+                    : _buildImagePlaceholder("No photos provided", height: 60),
+
+                // 6. ENGINEER NOTES
+                if (seal['item_notes'] != null && seal['item_notes'].toString().isNotEmpty) ...[
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      "Model: ${seal['manual_seal_name'] ?? 'Custom'}",
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      "Note: ${seal['item_notes']}",
+                      style: const TextStyle(fontSize: 12, color: Colors.black87),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-
-              // Technical Specs
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSpecItem("Type", seal['seal_type'] ?? 'N/A'),
-                  _buildSpecItem("Material", seal['material'] ?? 'N/A'),
-                  _buildSpecItem("Size (mm)", "${seal['inner_diameter']} x ${seal['outer_diameter']}"),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              const Text("SEAL PHOTOS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 8),
-
-              // Seal Images Logic with Placeholder
-              imageUrls.isNotEmpty
-                  ? SizedBox(
-                height: 110,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: imageUrls.length,
-                  itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: ImagePreviewer(
-                      url: imageUrls[index],
-                      // FIX: Use 'imageUrls' instead of 'item.images'
-                      galleryItems: imageUrls,
-                      initialIndex: index,
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.cover,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              )
-                  : _buildImagePlaceholder("No seal photos available for this item", height: 60),
-            ],
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
-      ],
+        ],
+      ),
     );
   }
 

@@ -193,6 +193,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/supabase_service.dart';
 import '../../theme.dart';
 import '../auth_page.dart';
 import 'edit_profile_page.dart';
@@ -205,6 +206,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+
+  final _authService = SupabaseService();
+
   final _supabase = Supabase.instance.client;
   String _fullName = "Engineer";
   String _email = "";
@@ -285,16 +289,7 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           TextButton(
-              onPressed: () async {
-                await _supabase.auth.signOut();
-                if (mounted) {
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (c) => const AuthPage()),
-                          (r) => false
-                  );
-                }
-              },
+              onPressed: () async => await _authService.signOut(context),
               child: const Text("Logout", style: TextStyle(color: Colors.red))
           ),
         ],
