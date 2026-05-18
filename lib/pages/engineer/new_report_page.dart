@@ -3082,6 +3082,7 @@ class _NewReportPageState extends State<NewReportPage> {
         builder: (context) => AddAssetPage(
           onSave: (newAsset) {
             setState(() => _assets.add(newAsset));
+            FocusScope.of(context).unfocus();
           },
         ),
       ),
@@ -3570,7 +3571,7 @@ class _NewReportPageState extends State<NewReportPage> {
           }
 
           // 5. INSERT SNAPSHOT INTO 'report_asset_items' (Includes Wear & Replacement metrics)
-          await _supabase.from('report_asset_items').insert({
+          await _supabase.from('asset_report_fridge_items').insert({
             'report_asset_id': assetId,
             'item_name': sealItem.itemName,
             'seal_id': sealItem.sealId,
@@ -3757,74 +3758,78 @@ class _NewReportPageState extends State<NewReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.primaryBackground,
-      appBar: AppBar(title: const Text("New Asset Report")),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
-                  child: Text("Select Customer", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary.withOpacity(0.7))),
-                ),
-                CustomCustomerDropdown(
-                  customers: _customers,
-                  selectedCustomerId: _selectedCustomerId,
-                  onChanged: (id) {
-                    setState(() => _selectedCustomerId = id);
-                    final cust = _customers.firstWhere((e) => e['id'].toString() == id);
-                    _generateReportTitle(cust['full_name'] ?? "Client");
-                  },
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _titleController,
-                        decoration: const InputDecoration(labelText: "Report Title", border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _reportNotesController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(labelText: "General Report Notes", border: OutlineInputBorder()),
-                      ),
-                    ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: AppTheme.primaryBackground,
+        appBar: AppBar(title: const Text("New Asset Report")),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+                    child: Text("Select Customer", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary.withOpacity(0.7))),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Text("ADDED ASSETS", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
-                ),
-              ],
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildSummaryCard(index),
-                childCount: _assets.length,
+                  CustomCustomerDropdown(
+                    customers: _customers,
+                    selectedCustomerId: _selectedCustomerId,
+                    onChanged: (id) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      setState(() => _selectedCustomerId = id);
+                      final cust = _customers.firstWhere((e) => e['id'].toString() == id);
+                      _generateReportTitle(cust['full_name'] ?? "Client");
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _titleController,
+                          decoration: const InputDecoration(labelText: "Report Title", border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _reportNotesController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(labelText: "General Report Notes", border: OutlineInputBorder()),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Text("ADDED ASSETS", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
+                  ),
+                ],
               ),
             ),
-          ),
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Column(
-              children: [
-                if (_assets.isEmpty) _buildEmptyState(),
-                const Spacer(),
-                _buildBottomActions(),
-              ],
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) => _buildSummaryCard(index),
+                  childCount: _assets.length,
+                ),
+              ),
             ),
-          ),
-        ],
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Column(
+                children: [
+                  if (_assets.isEmpty) _buildEmptyState(),
+                  const Spacer(),
+                  _buildBottomActions(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3901,8 +3906,21 @@ class _NewReportPageState extends State<NewReportPage> {
             : Container(
           width: 50, height: 50,
           decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: const Icon(Icons.kitchen, color: AppTheme.primary),
+          // child: const Icon(Icons.kitchen, color: AppTheme.primary),
+        // ),
+
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              // Fallback checking logic based on current configuration availability
+              asset.drawerCount > 0 && asset.doorCount == 0
+                  ? 'assets/images/drawer.jpeg'
+                  : 'assets/images/door.jpeg',
+              fit: BoxFit.cover,
+            ),
+          ),
         ),
+
         title: Row(
           children: [
             Expanded(
@@ -3990,7 +4008,24 @@ class _NewReportPageState extends State<NewReportPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.circle, size: 8, color: wearColor),
+              // Icon(Icons.circle, size: 8, color: wearColor),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: wearColor, width: 2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.asset(
+                    s.itemName.toLowerCase().contains('drawer')
+                        ? 'assets/images/drawer.jpeg'
+                        : 'assets/images/door.jpeg',
+                    width: 20,
+                    height: 20,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(s.itemName,

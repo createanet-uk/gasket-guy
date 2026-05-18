@@ -78,7 +78,7 @@ class _ViewReportPageState extends State<ViewReportPage> {
       final onlineData = await _supabase.from('asset_reports').select('''
         *,
         customer:user_profiles!customer_id(full_name, email),
-        fridges:assets_report_fridge(*, seals:report_asset_items(*))
+        fridges:assets_report_fridge(*, seals:asset_report_fridge_items(*))
       ''').eq('id', widget.reportId).single();
 
       setState(() {
@@ -187,7 +187,19 @@ class _ViewReportPageState extends State<ViewReportPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.kitchen, color: AppTheme.primary),
+                // const Icon(Icons.kitchen, color: AppTheme.primary),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    // Logic flag to load drawers overview if no explicit door quantities exist
+                    (fridge['drawer_count'] ?? 0) > 0 && (fridge['door_count'] ?? 0) == 0
+                        ? 'assets/images/drawer.jpeg'
+                        : 'assets/images/door.jpeg',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -519,17 +531,34 @@ class _ViewReportPageState extends State<ViewReportPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+
+                    Row(
                       children: [
-                        Text(
-                            seal['item_name'].toString().toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            seal['item_name'].toString().toLowerCase().contains('drawer')
+                                ? 'assets/images/drawer.jpeg'
+                                : 'assets/images/door.jpeg',
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          "Model: ${seal['manual_seal_name'] ?? 'Custom'}",
-                          style: TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w500),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                seal['item_name'].toString().toUpperCase(),
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5)
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Model: ${seal['manual_seal_name'] ?? 'Custom'}",
+                              style: TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
                       ],
                     ),

@@ -1426,7 +1426,7 @@ class _ReportListPageState extends State<ReportListPage> {
           customer:user_profiles!customer_id(full_name, email),
           fridges:assets_report_fridge(
             *,
-            seals:report_asset_items(*)
+            seals:asset_report_fridge_items(*)
           )
         ''')
           .eq('engineer_id', userId)

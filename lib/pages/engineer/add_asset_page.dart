@@ -2955,6 +2955,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
   }
 
   void _autoFillFromSelectedProduct(Map<String, dynamic> p, int index) {
+    FocusScope.of(context).unfocus();
     setState(() {
       var item = _entry.individualSeals[index];
 
@@ -3264,7 +3265,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
   }
 
 // --- NEW WIDGET METHOD: DETAILS PREVIEW SUB-ENGINE ---
-  Widget _buildConfigPreviewDetails(ScrollController sc, Map<String, dynamic> fridge, List<dynamic> comps, List<dynamic> rels) {
+  Widget  _buildConfigPreviewDetails(ScrollController sc, Map<String, dynamic> fridge, List<dynamic> comps, List<dynamic> rels) {
     final int totalCount = (fridge['door_count'] ?? 0) + (fridge['drawer_count'] ?? 0);
 
     return Column(
@@ -3305,6 +3306,25 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.asset(
+                                isDoor ? 'assets/images/door.jpeg' : 'assets/images/drawer.jpeg',
+                                width: 24,
+                                height: 24,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              componentLabel.toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.blueGrey),
+                            ),
+                          ],
+                        ),
                         Text(componentLabel.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.blueGrey)),
                         if (sealProduct != null)
                           Text(
@@ -3455,6 +3475,8 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
           _entry.individualSeals.add(item);
         }
       });
+
+      FocusManager.instance.primaryFocus?.unfocus();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3633,200 +3655,203 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text("Add Asset Detail"), elevation: 0),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle("1. LOCATION"),
-              TextField(
-                decoration: const InputDecoration(hintText: "e.g. Main Kitchen", border: OutlineInputBorder()),
-                onChanged: (val) => _entry.area = val,
-              ),
-
-              _buildSectionTitle("2. FRIDGE DATA PLATE"),
-              _buildDataPlatePicker(),
-
-              const SizedBox(height: 16),
-              // Manual/Autofilled Fridge Fields
-              // Container(
-              //   padding: const EdgeInsets.all(12),
-              //   decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(12)),
-              //   child: Column(
-              //     children: [
-              //       TextField(
-              //         controller: _brandController,
-              //         decoration: const InputDecoration(labelText: "Brand / Manufacturer", isDense: true),
-              //         onChanged: (val) => _entry.brand = val,
-              //       ),
-              //       const SizedBox(height: 8),
-              //       TextField(
-              //         controller: _modelController,
-              //         decoration: InputDecoration(
-              //           labelText: "Model Number",
-              //           isDense: true,
-              //           suffixIcon: IconButton(
-              //             icon: const Icon(Icons.search, color: AppTheme.primary),
-              //             onPressed: () async {
-              //               final matches = await _findMatchingFridges();
-              //               if (matches.isNotEmpty) {
-              //                 _showFridgeSelection(matches);
-              //               } else {
-              //                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No local matches found")));
-              //               }
-              //             },
-              //           ),
-              //         ),
-              //         onEditingComplete: () async {
-              //           final matches = await _findMatchingFridges();
-              //           if (matches.isNotEmpty) _showFridgeSelection(matches);
-              //         },
-              //       ),
-              //       const SizedBox(height: 8),
-              //       TextField(
-              //         controller: _serialController,
-              //         decoration: const InputDecoration(labelText: "Serial Number", isDense: true),
-              //         onChanged: (val) => _entry.serialNo = val,
-              //       ),
-              //     ],
-              //   ),
-              // ),
-
-
-              if (_isExtracting)
-                _buildFridgeDataShimmer()
-              else if (_extractionError != null)
-                _buildErrorState() // This will now show your helpful message
-              else
-                _buildFridgeFields(),
-              // MODIFIED SECTION
-              // _isExtracting
-              //     ? _buildFridgeDataShimmer() // Show Skeleton while AI is thinking
-              //     : Container(
-              //   padding: const EdgeInsets.all(12),
-              //   decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(12)),
-              //   child: Column(
-              //     children: [
-              //       TextField(
-              //         controller: _brandController,
-              //         decoration: const InputDecoration(labelText: "Brand / Manufacturer", isDense: true),
-              //         onChanged: (val) => _entry.brand = val,
-              //       ),
-              //       const SizedBox(height: 8),
-              //       TextField(
-              //         controller: _modelController,
-              //         decoration: InputDecoration(
-              //           labelText: "Model Number",
-              //           isDense: true,
-              //           suffixIcon: IconButton(
-              //             icon: const Icon(Icons.search, color: AppTheme.primary),
-              //             onPressed: () async {
-              //               final matches = await _findMatchingFridges();
-              //               if (matches.isNotEmpty) {
-              //                 _showFridgeSelection(matches);
-              //               } else {
-              //                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No local matches found")));
-              //               }
-              //             },
-              //           ),
-              //         ),
-              //         onEditingComplete: () async {
-              //           final matches = await _findMatchingFridges();
-              //           if (matches.isNotEmpty) _showFridgeSelection(matches);
-              //         },
-              //       ),
-              //       const SizedBox(height: 8),
-              //       TextField(
-              //         controller: _serialController,
-              //         decoration: const InputDecoration(labelText: "Serial Number", isDense: true),
-              //         onChanged: (val) => _entry.serialNo = val,
-              //       ),
-              //     ],
-              //   ),
-              // ),
-
-              _buildSectionTitle("3. COMPONENTS"),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _counterWidget("DOORS", _entry.doorCount, (val) {
-                      _entry.doorCount = val;
-                      _syncIndividualItemsList();
-                    }),
-                    _counterWidget("DRAWERS", _entry.drawerCount, (val) {
-                      _entry.drawerCount = val;
-                      _syncIndividualItemsList();
-                    }),
-                  ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(title: const Text("Add Asset Detail"), elevation: 0),
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle("1. LOCATION"),
+                TextField(
+                  decoration: const InputDecoration(hintText: "e.g. Main Kitchen", border: OutlineInputBorder()),
+                  onChanged: (val) => _entry.area = val,
                 ),
-              ),
-
-              _buildSectionTitle("4. SEAL CONFIGURATION"),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text("Use same seal for all items?", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                value: _entry.sealsAreCommon,
-                activeColor: AppTheme.primary,
-                onChanged: (val) {
-                  _entry.sealsAreCommon = val;
-                  _syncIndividualItemsList();
-                },
-              ),
-
-              const Divider(),
-
-              Column(
-                children: List.generate(_entry.individualSeals.length, (index) {
-                  return _buildItemVariantCard(index, _entry.individualSeals[index]);
-                }),
-              ),
-
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
-                  onPressed: () {
-                    if (_entry.area.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location required")));
-                      return;
-                    }
-                    _entry.modelNo = _modelController.text;
-                    _entry.serialNo = _serialController.text;
-                    _entry.brand = _brandController.text;
-
-                    for (var seal in _entry.individualSeals) {
-                      seal.sealType = seal.ctrls['type']!.text;
-                      seal.material = seal.ctrls['material']!.text;
-                      seal.hardness = seal.ctrls['hardness']!.text;
-                      seal.innerDiameter = double.tryParse(seal.ctrls['inner']!.text) ?? 0.0;
-                      seal.outerDiameter = double.tryParse(seal.ctrls['outer']!.text) ?? 0.0;
-                      seal.thickness = double.tryParse(seal.ctrls['thickness']!.text) ?? 0.0;
-                      seal.sealModelNumber = seal.ctrls['modelNum']!.text;
-                      seal.tempRange = seal.ctrls['temp']!.text;
-                      seal.brand = seal.ctrls['brand']!.text;
-                      seal.application = seal.ctrls['app']!.text;
-                      seal.description = seal.ctrls['desc']!.text;
-                      // --- ADD THESE ACCORDINGLY TO PARSE DIMENSIONS ---
-                      seal.doorHeight = double.tryParse(seal.ctrls['height']!.text) ?? 0.0;
-                      seal.doorWidth = double.tryParse(seal.ctrls['width']!.text) ?? 0.0;
-                    }
-
-                    widget.onSave(_entry);
-                    Navigator.pop(context);
+      
+                _buildSectionTitle("2. FRIDGE DATA PLATE"),
+                _buildDataPlatePicker(),
+      
+                const SizedBox(height: 16),
+                // Manual/Autofilled Fridge Fields
+                // Container(
+                //   padding: const EdgeInsets.all(12),
+                //   decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(12)),
+                //   child: Column(
+                //     children: [
+                //       TextField(
+                //         controller: _brandController,
+                //         decoration: const InputDecoration(labelText: "Brand / Manufacturer", isDense: true),
+                //         onChanged: (val) => _entry.brand = val,
+                //       ),
+                //       const SizedBox(height: 8),
+                //       TextField(
+                //         controller: _modelController,
+                //         decoration: InputDecoration(
+                //           labelText: "Model Number",
+                //           isDense: true,
+                //           suffixIcon: IconButton(
+                //             icon: const Icon(Icons.search, color: AppTheme.primary),
+                //             onPressed: () async {
+                //               final matches = await _findMatchingFridges();
+                //               if (matches.isNotEmpty) {
+                //                 _showFridgeSelection(matches);
+                //               } else {
+                //                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No local matches found")));
+                //               }
+                //             },
+                //           ),
+                //         ),
+                //         onEditingComplete: () async {
+                //           final matches = await _findMatchingFridges();
+                //           if (matches.isNotEmpty) _showFridgeSelection(matches);
+                //         },
+                //       ),
+                //       const SizedBox(height: 8),
+                //       TextField(
+                //         controller: _serialController,
+                //         decoration: const InputDecoration(labelText: "Serial Number", isDense: true),
+                //         onChanged: (val) => _entry.serialNo = val,
+                //       ),
+                //     ],
+                //   ),
+                // ),
+      
+      
+                if (_isExtracting)
+                  _buildFridgeDataShimmer()
+                else if (_extractionError != null)
+                  _buildErrorState() // This will now show your helpful message
+                else
+                  _buildFridgeFields(),
+                // MODIFIED SECTION
+                // _isExtracting
+                //     ? _buildFridgeDataShimmer() // Show Skeleton while AI is thinking
+                //     : Container(
+                //   padding: const EdgeInsets.all(12),
+                //   decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(12)),
+                //   child: Column(
+                //     children: [
+                //       TextField(
+                //         controller: _brandController,
+                //         decoration: const InputDecoration(labelText: "Brand / Manufacturer", isDense: true),
+                //         onChanged: (val) => _entry.brand = val,
+                //       ),
+                //       const SizedBox(height: 8),
+                //       TextField(
+                //         controller: _modelController,
+                //         decoration: InputDecoration(
+                //           labelText: "Model Number",
+                //           isDense: true,
+                //           suffixIcon: IconButton(
+                //             icon: const Icon(Icons.search, color: AppTheme.primary),
+                //             onPressed: () async {
+                //               final matches = await _findMatchingFridges();
+                //               if (matches.isNotEmpty) {
+                //                 _showFridgeSelection(matches);
+                //               } else {
+                //                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No local matches found")));
+                //               }
+                //             },
+                //           ),
+                //         ),
+                //         onEditingComplete: () async {
+                //           final matches = await _findMatchingFridges();
+                //           if (matches.isNotEmpty) _showFridgeSelection(matches);
+                //         },
+                //       ),
+                //       const SizedBox(height: 8),
+                //       TextField(
+                //         controller: _serialController,
+                //         decoration: const InputDecoration(labelText: "Serial Number", isDense: true),
+                //         onChanged: (val) => _entry.serialNo = val,
+                //       ),
+                //     ],
+                //   ),
+                // ),
+      
+                _buildSectionTitle("3. COMPONENTS"),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _counterWidget("DOORS", _entry.doorCount, (val) {
+                        _entry.doorCount = val;
+                        _syncIndividualItemsList();
+                      }),
+                      _counterWidget("DRAWERS", _entry.drawerCount, (val) {
+                        _entry.drawerCount = val;
+                        _syncIndividualItemsList();
+                      }),
+                    ],
+                  ),
+                ),
+      
+                _buildSectionTitle("4. SEAL CONFIGURATION"),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text("Use same seal for all items?", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  value: _entry.sealsAreCommon,
+                  activeColor: AppTheme.primary,
+                  onChanged: (val) {
+                    _entry.sealsAreCommon = val;
+                    _syncIndividualItemsList();
                   },
-                  child: const Text("SAVE FRIDGE ASSET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-              ),
-              const SizedBox(height: 30),
-            ],
+      
+                const Divider(),
+      
+                Column(
+                  children: List.generate(_entry.individualSeals.length, (index) {
+                    return _buildItemVariantCard(index, _entry.individualSeals[index]);
+                  }),
+                ),
+      
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+                    onPressed: () {
+                      if (_entry.area.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location required")));
+                        return;
+                      }
+                      _entry.modelNo = _modelController.text;
+                      _entry.serialNo = _serialController.text;
+                      _entry.brand = _brandController.text;
+      
+                      for (var seal in _entry.individualSeals) {
+                        seal.sealType = seal.ctrls['type']!.text;
+                        seal.material = seal.ctrls['material']!.text;
+                        seal.hardness = seal.ctrls['hardness']!.text;
+                        seal.innerDiameter = double.tryParse(seal.ctrls['inner']!.text) ?? 0.0;
+                        seal.outerDiameter = double.tryParse(seal.ctrls['outer']!.text) ?? 0.0;
+                        seal.thickness = double.tryParse(seal.ctrls['thickness']!.text) ?? 0.0;
+                        seal.sealModelNumber = seal.ctrls['modelNum']!.text;
+                        seal.tempRange = seal.ctrls['temp']!.text;
+                        seal.brand = seal.ctrls['brand']!.text;
+                        seal.application = seal.ctrls['app']!.text;
+                        seal.description = seal.ctrls['desc']!.text;
+                        // --- ADD THESE ACCORDINGLY TO PARSE DIMENSIONS ---
+                        seal.doorHeight = double.tryParse(seal.ctrls['height']!.text) ?? 0.0;
+                        seal.doorWidth = double.tryParse(seal.ctrls['width']!.text) ?? 0.0;
+                      }
+      
+                      widget.onSave(_entry);
+                      Navigator.pop(context);
+                    },
+                    child: const Text("SAVE FRIDGE ASSET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),
@@ -3884,6 +3909,18 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                   color: item.needsUrgentReplacement ? AppTheme.error : statusColor,
                 ),
                 const SizedBox(width: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.asset(
+                    item.itemName.toLowerCase().contains('door')
+                        ? 'assets/images/door.jpeg'
+                        : 'assets/images/drawer.jpeg',
+                    width: 20,
+                    height: 20,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text(item.itemName.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const Spacer(),
                 if (item.isIdentified)
@@ -4156,17 +4193,59 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
     child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 13)),
   );
 
-  Widget _counterWidget(String label, int value, Function(int) onChanged) => Column(
-    children: [
-      Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => setState(() => onChanged(value > 0 ? value - 1 : 0))),
-        Text("$value", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => setState(() => onChanged(value + 1))),
-      ])
-    ],
-  );
+  // Widget _counterWidget(String label, int value, Function(int) onChanged) => Column(
+  //   children: [
+  //     Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+  //     Row(mainAxisSize: MainAxisSize.min, children: [
+  //       IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => setState(() => onChanged(value > 0 ? value - 1 : 0))),
+  //       Text("$value", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+  //       IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => setState(() => onChanged(value + 1))),
+  //     ])
+  //   ],
+  // );
 
+
+
+  Widget _counterWidget(String label, int value, Function(int) onChanged) {
+    // Determine which local image to display based on the label text
+    final String assetPath = label.toLowerCase().contains('door')
+        ? 'assets/images/door.jpeg'
+        : 'assets/images/drawer.jpeg';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 1. Display the asset thumbnail image above the label text
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.asset(
+            assetPath,
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              onPressed: () => setState(() => onChanged(value > 0 ? value - 1 : 0)),
+            ),
+            Text("$value", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () => setState(() => onChanged(value + 1)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _buildDataPlatePicker() {
     const double containerHeight = 220.0;
