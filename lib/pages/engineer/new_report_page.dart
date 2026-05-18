@@ -3628,61 +3628,95 @@ class _NewReportPageState extends State<NewReportPage> {
           }
 
           // 7. SYNC MANY-TO-MANY RELATIONSHIP WITH COMPONENTS LINKED INSIDE ARRAY
+          // if (sealItem.sealId != null && asset.fridgeId != null) {
+          //   final existingRelation = await _supabase
+          //       .from('fridge_seals_relation')
+          //       .select()
+          //       .eq('fridge_id', asset.fridgeId!)
+          //       .eq('seal_product_id', sealItem.sealId!)
+          //       .eq('location', sealItem.itemName)
+          //       .maybeSingle();
+          //
+          //   List<String> currentComponentIds = [];
+          //
+          //   if (existingRelation != null) {
+          //     // Existing Relation Found -> Pull current linked array elements
+          //     if (existingRelation['supported_component_ids'] != null) {
+          //       currentComponentIds = List<String>.from(existingRelation['supported_component_ids']);
+          //     }
+          //
+          //     // Append component token to unique listing array cleanly
+          //     if (componentUuid != null && !currentComponentIds.contains(componentUuid)) {
+          //       currentComponentIds.add(componentUuid);
+          //     }
+          //
+          //     // Save back the updated component linkage safely
+          //     await _supabase.from('fridge_seals_relation').update({
+          //       'supported_component_ids': currentComponentIds,
+          //       'updated_at': DateTime.now().toIso8601String(),
+          //     }).eq('id', existingRelation['id']);
+          //
+          //   } else {
+          //     // No Relation Found -> Create completely new relationship mapping layout row
+          //     if (componentUuid != null) {
+          //       currentComponentIds.add(componentUuid);
+          //     }
+          //
+          //     // await _supabase.from('fridge_seals_relation').insert({
+          //     //   'fridge_id': asset.fridgeId,
+          //     //   'seal_product_id': sealItem.sealId,
+          //     //   'location': sealItem.itemName,
+          //     //   'supported_component_ids': currentComponentIds,
+          //     //   'quantity': 1,
+          //     //   'is_primary': false,
+          //     //   'confidence_score': sealItem.confidence,
+          //     //   'matching_notes': "Learned and relational linked via component index from Report: $reportId",
+          //     //   'suggested_by_user_id': _supabase.auth.currentUser!.id,
+          //     // });
+          //
+          //     //  TO THIS (Correct Fixed Code)
+          //     await _supabase.from('fridge_seals_relation').insert({
+          //       'fridge_id': asset.fridgeId,
+          //       'seal_product_id': sealItem.sealId,
+          //       'location': sealItem.itemName,
+          //       'supported_component_ids': currentComponentIds,
+          //       'is_verified': false, // ✅ FIXED: Changed to match your database schema column
+          //       'confidence_score': sealItem.confidence,
+          //       'matching_notes': "Learned and relational linked via component index from Report: $reportId",
+          //       'suggested_by_user_id': _supabase.auth.currentUser!.id,
+          //     });
+          //   }
+          // }
+
           if (sealItem.sealId != null && asset.fridgeId != null) {
+            // 1. Check for an existing relation based on fridge, seal layout, and specific component
             final existingRelation = await _supabase
                 .from('fridge_seals_relation')
                 .select()
                 .eq('fridge_id', asset.fridgeId!)
                 .eq('seal_product_id', sealItem.sealId!)
                 .eq('location', sealItem.itemName)
+                .eq('supported_component_id', componentUuid!) // ✅ Checked down to the unique component column
                 .maybeSingle();
 
-            List<String> currentComponentIds = [];
-
             if (existingRelation != null) {
-              // Existing Relation Found -> Pull current linked array elements
-              if (existingRelation['supported_component_ids'] != null) {
-                currentComponentIds = List<String>.from(existingRelation['supported_component_ids']);
-              }
-
-              // Append component token to unique listing array cleanly
-              if (componentUuid != null && !currentComponentIds.contains(componentUuid)) {
-                currentComponentIds.add(componentUuid);
-              }
-
-              // Save back the updated component linkage safely
+              // Existing Relation Found -> Simply refresh the timestamp and quantity metadata if required
               await _supabase.from('fridge_seals_relation').update({
-                'supported_component_ids': currentComponentIds,
+                'quantity': (existingRelation['quantity'] ?? 1) + 1, // Optional auto-increment increment wrapper
                 'updated_at': DateTime.now().toIso8601String(),
               }).eq('id', existingRelation['id']);
 
             } else {
-              // No Relation Found -> Create completely new relationship mapping layout row
-              if (componentUuid != null) {
-                currentComponentIds.add(componentUuid);
-              }
-
-              // await _supabase.from('fridge_seals_relation').insert({
-              //   'fridge_id': asset.fridgeId,
-              //   'seal_product_id': sealItem.sealId,
-              //   'location': sealItem.itemName,
-              //   'supported_component_ids': currentComponentIds,
-              //   'quantity': 1,
-              //   'is_primary': false,
-              //   'confidence_score': sealItem.confidence,
-              //   'matching_notes': "Learned and relational linked via component index from Report: $reportId",
-              //   'suggested_by_user_id': _supabase.auth.currentUser!.id,
-              // });
-
-              //  TO THIS (Correct Fixed Code)
+              // No Relation Found -> Create completely new relationship mapping layout mapping row
               await _supabase.from('fridge_seals_relation').insert({
                 'fridge_id': asset.fridgeId,
                 'seal_product_id': sealItem.sealId,
                 'location': sealItem.itemName,
-                'supported_component_ids': currentComponentIds,
-                'is_verified': false, // ✅ FIXED: Changed to match your database schema column
+                'supported_component_id': componentUuid, // ✅ FIXED: Saving the direct UUID directly instead of a list variable
+                'quantity': 1,
+                'is_verified': false,
                 'confidence_score': sealItem.confidence,
-                'matching_notes': "Learned and relational linked via component index from Report: $reportId",
+                'matching_notes': "Learned and relational linked via component direct UUID from Report: $reportId",
                 'suggested_by_user_id': _supabase.auth.currentUser!.id,
               });
             }
