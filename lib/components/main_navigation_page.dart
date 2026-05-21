@@ -38,6 +38,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. DYNAMIC TABLET DETECTION CHECK logic
+    // shortestSide returns the width in portrait or height in landscape.
+    // >= 600 means it is a tablet form factor.
+    final bool isTablet = MediaQuery.of(context).size.shortestSide >= 600;
     return Scaffold(
       // 2. THE BODY CHANGES BASED ON SELECTION
       body: IndexedStack(
@@ -46,7 +50,11 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       ),
       // 3. THE BOTTOM BAR
       bottomNavigationBar: Container(
+        padding: EdgeInsets.only(
+          bottom: isTablet ? 40.0 : 0.0, // ✅ Adds exactly 40px spacing if device is a tablet
+        ),
         decoration: BoxDecoration(
+          color: Colors.white,
           boxShadow: [
             BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 0),
           ],
@@ -59,6 +67,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
+          elevation: 0,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment_outlined),
