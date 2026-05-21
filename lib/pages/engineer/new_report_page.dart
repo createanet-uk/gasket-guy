@@ -4581,6 +4581,7 @@ class _NewReportPageState extends State<NewReportPage> {
       context,
       MaterialPageRoute(
         builder: (context) => AddAssetPage(
+          assetsList: _assets,
           onSave: (newAsset) {
             setState(() => _assets.add(newAsset));
             FocusScope.of(context).unfocus();

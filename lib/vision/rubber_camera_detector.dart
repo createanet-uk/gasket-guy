@@ -1085,6 +1085,8 @@ class _RubberCameraDetectorPageState extends State<RubberCameraDetectorPage> {
   File? capturedImage;
   List<Detection> detections = [];
 
+  FlashMode _flashMode = FlashMode.torch;
+
   bool isLoading = true;
   bool isDetecting = false;
 
@@ -1105,6 +1107,14 @@ class _RubberCameraDetectorPageState extends State<RubberCameraDetectorPage> {
 
     await controller!.initialize();
 
+    try {
+      await controller!.setFlashMode(FlashMode.torch);
+      _flashMode = FlashMode.torch;
+    } catch (e) {
+      debugPrint('Error enabling default flashlight: $e');
+      _flashMode = FlashMode.off;
+    }
+
     interpreter = await Interpreter.fromAsset(
       'assets/model/best_float32.tflite',
     );
@@ -1112,6 +1122,23 @@ class _RubberCameraDetectorPageState extends State<RubberCameraDetectorPage> {
     setState(() {
       isLoading = false;
     });
+  }
+
+
+  Future<void> _toggleFlash() async {
+    if (controller == null || !controller!.value.isInitialized) return;
+
+    // Toggle between completely Off and Continuous Torch (Flashlight)
+    final newMode = _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
+
+    try {
+      await controller!.setFlashMode(newMode);
+      setState(() {
+        _flashMode = newMode;
+      });
+    } catch (e) {
+      debugPrint('Error toggling camera flashlight: $e');
+    }
   }
 
   // =========================
@@ -1355,6 +1382,32 @@ class _RubberCameraDetectorPageState extends State<RubberCameraDetectorPage> {
               if (capturedImage != null)
                 Positioned.fill(
                   child: CustomPaint(painter: BoxPainter(detections)),
+                ),
+
+              // FLASH LIGHT TOGGLE BUTTON (Only visible when camera previewing)
+              if (capturedImage == null)
+                Positioned(
+                  top: 50,
+                  right: 20,
+                  child: SafeArea(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black45,
+                      radius: 25,
+                      child: IconButton(
+                        icon: Icon(
+                          _flashMode == FlashMode.torch
+                              ? Icons.flash_on
+                              : Icons.flash_off,
+                          color: _flashMode == FlashMode.torch
+                              ? Colors.yellowAccent
+                              : Colors.white,
+                          size: 26,
+                        ),
+                        onPressed: _toggleFlash,
+                        tooltip: 'Toggle Flashlight',
+                      ),
+                    ),
+                  ),
                 ),
 
               if (capturedImage == null)

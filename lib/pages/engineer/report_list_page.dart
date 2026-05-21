@@ -3458,6 +3458,7 @@ class _ReportListPageState extends State<ReportListPage> {
         onPressed: () async {
           await Navigator.push(context, MaterialPageRoute(builder: (c) => const NewReportPage()));
           _refreshData();
+          _startFullSyncProcess();
         },
         label: const Text("NEW REPORT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add, color: Colors.white),
