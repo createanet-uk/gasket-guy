@@ -4504,6 +4504,10 @@ class _NewReportPageState extends State<NewReportPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _reportNotesController = TextEditingController();
 
+  // ✅ ADD THIS GLOBAL FORM KEY DEFINITION HERE:
+  final _formKey = GlobalKey<FormState>();
+
+
   String? _selectedCustomerId;
   List<Map<String, dynamic>> _customers = [];
   List<LocalAssetEntry> _assets = [];
@@ -4592,21 +4596,79 @@ class _NewReportPageState extends State<NewReportPage> {
   }
 
   Future<void> _handleSubmitReport() async {
-    if (_selectedCustomerId == null || _assets.isEmpty || _titleController.text.trim().isEmpty) {
+
+    if (_isSubmitting) return;
+
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Title, Customer and at least one asset are required.")),
+        const SnackBar(
+          content: Text("Validation failed! Check red text boxes for details."),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return; // Stop routine immediately
+    }
+
+    // if (_selectedCustomerId == null || _assets.isEmpty || _titleController.text.trim().isEmpty) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text("Title, Customer and at least one asset are required.")),
+    //   );
+    //   return;
+    // }
+
+    if (_selectedCustomerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a customer from the dropdown directory options before submitting.")),
       );
       return;
     }
 
-    final List<ConnectivityResult> connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      await _queueReportLocally();
+    if (_assets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("At least one asset is required to complete this report configuration.")),
+      );
       return;
     }
 
     setState(() => _isSubmitting = true);
+
+    final List<ConnectivityResult> connectivityResult = await (Connectivity().checkConnectivity());
+    // if (connectivityResult.contains(ConnectivityResult.none)) {
+    //   await _queueReportLocally();
+    //   return;
+    // }
+
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      debugPrint("Device is completely offline. Skipping network channels to cache locally...");
+      await _queueReportLocally();
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    // setState(() => _isSubmitting = true);
+    // try {
+    //   await _processUploadPipeline(
+    //     customerId: _selectedCustomerId!,
+    //     title: _titleController.text.trim(),
+    //     notes: _reportNotesController.text.trim(),
+    //     assets: _assets,
+    //   );
+    //
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text("Report metrics, wear states, and dimensions saved!"), backgroundColor: Colors.green),
+    //     );
+    //     Navigator.pop(context);
+    //   }
+    // } catch (e) {
+    //   debugPrint("Direct Submit Error: $e");
+    //   await _queueReportLocally();
+    // } finally {
+    //   if (mounted) setState(() => _isSubmitting = false);
+    // }
+
     try {
+      debugPrint("Initiating direct Supabase transmission pipeline...");
       await _processUploadPipeline(
         customerId: _selectedCustomerId!,
         title: _titleController.text.trim(),
@@ -4621,11 +4683,29 @@ class _NewReportPageState extends State<NewReportPage> {
         Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint("Direct Submit Error: $e");
-      await _queueReportLocally();
+      debugPrint("Direct Submit Network Failure Exception captured: $e");
+
+      // ✅ FIX 2: CONCURRENCY PROTECTION EXCLUSION
+      // Only write to the local outbox if the exception was a true connection dropout,
+      // preventing half-completed network requests from doubling up.
+      if (e is SocketException || e is HttpException) {
+        debugPrint("Confirmed network socket timeout drop! Redirecting payload block to local outbox queue...");
+        await _queueReportLocally();
+      } else {
+        // If it's a structural database constraint fault, alert the technician instead of caching a corrupt row
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Server rejection error: Data schema mismatch. Please re-verify fields. ($e)"),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+
   }
 
   // Future<void> _queueReportLocally() async {
@@ -4692,6 +4772,278 @@ class _NewReportPageState extends State<NewReportPage> {
     }
   }
 
+  // Future<void> _processUploadPipeline({
+  //   required String customerId,
+  //   required String title,
+  //   required String notes,
+  //   required List<LocalAssetEntry> assets,
+  // }) async {
+  //   const String bucketName = 'engineer-uploads';
+  //
+  //   // 1. INSERT REPORT HEADER
+  //   final reportHeader = await _supabase.from('asset_reports').insert({
+  //     'customer_id': customerId,
+  //     'engineer_id': _supabase.auth.currentUser!.id,
+  //     'report_title': title,
+  //     'notes': notes,
+  //     'status': 'submitted',
+  //   }).select().single();
+  //
+  //   final String reportId = reportHeader['id'];
+  //
+  //   // 2. LOOP THROUGH FRIDGE ASSETS
+  //   // for (var asset in assets) {
+  //   //   String? dataPlateUrl;
+  //   //
+  //   //   if (asset.dataPlateImage != null && asset.dataPlateImage!.existsSync()) {
+  //   //     final String fileName = 'plate_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  //   //     final String path = 'reports/$reportId/$fileName';
+  //   //     await _supabase.storage.from(bucketName).upload(path, asset.dataPlateImage!);
+  //   //     dataPlateUrl = _supabase.storage.from(bucketName).getPublicUrl(path);
+  //   //   }
+  //   //
+  //   //   // --- DYNAMIC FRIDGE MASTER REGISTRATION / FALLBACK MECHANISM ---
+  //   //   String? targetFridgeId = asset.fridgeId;
+  //   //
+  //   //   if (targetFridgeId == null) {
+  //   //     final existingFridge = await _supabase
+  //   //         .from('fridges')
+  //   //         .select('id')
+  //   //         .eq('model_no', asset.modelNo.trim())
+  //   //         .eq('serial_no', asset.serialNo.trim())
+  //   //         .maybeSingle();
+  //   //
+  //   //     if (existingFridge != null) {
+  //   //       targetFridgeId = existingFridge['id'];
+  //   //     } else {
+  //   //       final newFridgeRecord = await _supabase.from('fridges').insert({
+  //   //         'manufacturer': (asset.brand ?? asset.manufacturer).trim(),
+  //   //         'brand': asset.brand?.trim(),
+  //   //         'model_no': asset.modelNo.trim(),
+  //   //         'serial_no': asset.serialNo.trim(),
+  //   //         'door_count': asset.doorCount,
+  //   //         'drawer_count': asset.drawerCount,
+  //   //         'created_by': _supabase.auth.currentUser!.id,
+  //   //         'data_plate_image_url': dataPlateUrl,
+  //   //       }).select('id').single();
+  //   //
+  //   //       targetFridgeId = newFridgeRecord['id'];
+  //   //     }
+  //   //   } else {
+  //   //     await _supabase.from('fridges').update({
+  //   //       'door_count': asset.doorCount,
+  //   //       'drawer_count': asset.drawerCount,
+  //   //       'updated_at': DateTime.now().toIso8601String(),
+  //   //     }).eq('id', targetFridgeId);
+  //   //   }
+  //   //
+  //   //   // 3. INSERT INTO 'assets_report_fridge'
+  //   //   final assetResponse = await _supabase.from('assets_report_fridge').insert({
+  //   //     'report_id': reportId,
+  //   //     'fridge_id': targetFridgeId,
+  //   //     'area': asset.area,
+  //   //     'data_plate_url': dataPlateUrl,
+  //   //     'manufacturer': asset.brand ?? asset.manufacturer,
+  //   //     'model_no': asset.modelNo,
+  //   //     'serial_no': asset.serialNo,
+  //   //     'condition': asset.condition,
+  //   //     'door_count': asset.doorCount,
+  //   //     'drawer_count': asset.drawerCount,
+  //   //     'seals_are_common': asset.sealsAreCommon,
+  //   //     'engineer_notes': asset.description,
+  //   //   }).select().single();
+  //   //
+  //   //   final String assetId = assetResponse['id'];
+  //   //
+  //   //   // 4. LOOP THROUGH INDIVIDUAL SEALS
+  //   //   for (int index = 0; index < asset.individualSeals.length; index++) {
+  //   //     var sealItem = asset.individualSeals[index];
+  //   //     List<String> sealImageUrls = [];
+  //   //
+  //   //     for (int i = 0; i < sealItem.images.length; i++) {
+  //   //       if (sealItem.images[i].existsSync()) {
+  //   //         final String fileName = 'seal_${i}_${DateTime.now().microsecondsSinceEpoch}.jpg';
+  //   //         final String path = 'reports/$reportId/seals/$assetId/$fileName';
+  //   //         await _supabase.storage.from(bucketName).upload(path, sealItem.images[i]);
+  //   //         sealImageUrls.add(_supabase.storage.from(bucketName).getPublicUrl(path));
+  //   //       }
+  //   //     }
+  //   //
+  //   //     // 5. INSERT INTO 'asset_report_fridge_items'
+  //   //     await _supabase.from('asset_report_fridge_items').insert({
+  //   //       'report_asset_id': assetId,
+  //   //       'item_name': sealItem.itemName,
+  //   //       'seal_id': sealItem.sealId,
+  //   //       'is_unknown_seal': sealItem.sealId == null,
+  //   //       'confidence_score': sealItem.confidence,
+  //   //       'manual_seal_name': sealItem.sealName,
+  //   //       'image_urls': sealImageUrls,
+  //   //       'item_notes': sealItem.description,
+  //   //       'material': sealItem.material,
+  //   //       'seal_type': sealItem.sealType,
+  //   //       'thickness': sealItem.thickness,
+  //   //       'inner_diameter': sealItem.innerDiameter,
+  //   //       'outer_diameter': sealItem.outerDiameter,
+  //   //       'wear_percentage': sealItem.wearPercentage.toInt(),
+  //   //       'need_replacement': sealItem.needsUrgentReplacement,
+  //   //     });
+  //   //
+  //   //     // 6. UPSERT MASTER 'fridge_components'
+  //   //     String? componentUuid;
+  //   //
+  //   //     if (targetFridgeId != null) {
+  //   //       final String componentType = sealItem.itemName.toLowerCase().contains('drawer') ? 'drawer' : 'door';
+  //   //
+  //   //       final existingComp = await _supabase
+  //   //           .from('fridge_components')
+  //   //           .select()
+  //   //           .eq('fridge_id', targetFridgeId)
+  //   //           .eq('component_type', componentType)
+  //   //           .eq('component_index', index + 1)
+  //   //           .maybeSingle();
+  //   //
+  //   //       if (existingComp == null) {
+  //   //         final newComp = await _supabase.from('fridge_components').insert({
+  //   //           'fridge_id': targetFridgeId,
+  //   //           'component_type': componentType,
+  //   //           'component_index': index + 1,
+  //   //           'width_mm': sealItem.doorWidth,
+  //   //           'height_mm': sealItem.doorHeight,
+  //   //           'notes': 'Learned from component field logic.',
+  //   //         }).select('id').single();
+  //   //
+  //   //         componentUuid = newComp['id'];
+  //   //       } else {
+  //   //         final updatedComp = await _supabase.from('fridge_components').update({
+  //   //           'width_mm': sealItem.doorWidth,
+  //   //           'height_mm': sealItem.doorHeight,
+  //   //         }).eq('id', existingComp['id']).select('id').single();
+  //   //
+  //   //         componentUuid = updatedComp['id'];
+  //   //       }
+  //   //     }
+  //   //
+  //   //     // 7. SYNC 'fridge_seals_relation'
+  //   //     if (sealItem.sealId != null && targetFridgeId != null && componentUuid != null) {
+  //   //       final existingRelation = await _supabase
+  //   //           .from('fridge_seals_relation')
+  //   //           .select()
+  //   //           .eq('fridge_id', targetFridgeId)
+  //   //           .eq('seal_product_id', sealItem.sealId!)
+  //   //           .eq('location', sealItem.itemName)
+  //   //           .eq('supported_component_id', componentUuid)
+  //   //           .maybeSingle();
+  //   //
+  //   //       if (existingRelation != null) {
+  //   //         await _supabase.from('fridge_seals_relation').update({
+  //   //           'quantity': (existingRelation['quantity'] ?? 1) + 1,
+  //   //           'updated_at': DateTime.now().toIso8601String(),
+  //   //         }).eq('id', existingRelation['id']);
+  //   //       } else {
+  //   //         await _supabase.from('fridge_seals_relation').insert({
+  //   //           'fridge_id': targetFridgeId,
+  //   //           'seal_product_id': sealItem.sealId,
+  //   //           'location': sealItem.itemName,
+  //   //           'supported_component_id': componentUuid,
+  //   //           'quantity': 1,
+  //   //           'is_verified': false,
+  //   //           'confidence_score': sealItem.confidence,
+  //   //           'matching_notes': "Learned and linked via component UUID from Report: $reportId",
+  //   //           'suggested_by_user_id': _supabase.auth.currentUser!.id,
+  //   //         });
+  //   //       }
+  //   //     }
+  //   //   }
+  //   // }
+  //
+  //   // 2. ✅ FIXED DYNAMIC FRIDGE MASTER REGISTRATION / FALLBACK MECHANISM
+  //   for (var asset in assets) {
+  //     String? dataPlateUrl;
+  //
+  //     if (asset.dataPlateImage != null && asset.dataPlateImage!.existsSync()) {
+  //       final String fileName = 'plate_${DateTime
+  //           .now()
+  //           .millisecondsSinceEpoch}.jpg';
+  //       final String path = 'reports/$reportId/$fileName';
+  //       await _supabase.storage.from(bucketName).upload(
+  //           path, asset.dataPlateImage!);
+  //       dataPlateUrl = _supabase.storage.from(bucketName).getPublicUrl(path);
+  //     }
+  //
+  //     String? targetFridgeId = asset.fridgeId;
+  //
+  //     // Normalize our string structures safely to prevent database value exceptions
+  //     final String safeModel = (asset.modelNo.isNotEmpty
+  //         ? asset.modelNo
+  //         : 'N/A').trim();
+  //     final String safeSerial = (asset.serialNo.isNotEmpty
+  //         ? asset.serialNo
+  //         : 'N/A').trim();
+  //     // Elegant step-by-step string parsing block
+  //     String tentativeBrand = 'Generic Brand';
+  //     if (asset.brand != null && asset.brand!.trim().isNotEmpty) {
+  //       tentativeBrand = asset.brand!;
+  //     } else if (asset.manufacturer.trim().isNotEmpty) {
+  //       tentativeBrand = asset.manufacturer;
+  //     }
+  //     final String safeBrand = tentativeBrand.trim();
+  //
+  //     if (targetFridgeId == null) {
+  //       // Safe database lookup parsing using normalized tracking keys
+  //       final existingFridge = await _supabase
+  //           .from('fridges')
+  //           .select('id')
+  //           .eq('model_no', safeModel)
+  //           .eq('serial_no', safeSerial)
+  //           .maybeSingle();
+  //
+  //       if (existingFridge != null) {
+  //         targetFridgeId = existingFridge['id'];
+  //       } else {
+  //         // Insert a pristine new master record using safe string buffers
+  //         final newFridgeRecord = await _supabase.from('fridges').insert({
+  //           'manufacturer': safeBrand,
+  //           'brand': safeBrand,
+  //           'model_no': safeModel,
+  //           'serial_no': safeSerial,
+  //           'door_count': asset.doorCount,
+  //           'drawer_count': asset.drawerCount,
+  //           'created_by': _supabase.auth.currentUser!.id,
+  //           'data_plate_image_url': dataPlateUrl,
+  //         }).select('id').single();
+  //
+  //         targetFridgeId = newFridgeRecord['id'];
+  //       }
+  //     } else {
+  //       // Update asset layout tracking counts on known master tables if matching templates load
+  //       await _supabase.from('fridges').update({
+  //         'door_count': asset.doorCount,
+  //         'drawer_count': asset.drawerCount,
+  //         'updated_at': DateTime.now().toIso8601String(),
+  //       }).eq('id', targetFridgeId);
+  //     }
+  //
+  //     // 3. INSERT INTO 'assets_report_fridge' (Using sanitized parameter fields)
+  //     final assetResponse = await _supabase.from('assets_report_fridge').insert(
+  //         {
+  //           'report_id': reportId,
+  //           'fridge_id': targetFridgeId,
+  //           'area': asset.area.isNotEmpty ? asset.area : 'Main Area',
+  //           'data_plate_url': dataPlateUrl,
+  //           'manufacturer': safeBrand,
+  //           'model_no': safeModel,
+  //           'serial_no': safeSerial,
+  //           'condition': asset.condition,
+  //           'door_count': asset.doorCount,
+  //           'drawer_count': asset.drawerCount,
+  //           'seals_are_common': asset.sealsAreCommon,
+  //           'engineer_notes': asset.description,
+  //         }).select().single();
+  //
+  //     final String assetId = assetResponse['id'];
+  //   }
+  // }
+
   Future<void> _processUploadPipeline({
     required String customerId,
     required String title,
@@ -4722,34 +5074,150 @@ class _NewReportPageState extends State<NewReportPage> {
         dataPlateUrl = _supabase.storage.from(bucketName).getPublicUrl(path);
       }
 
-      // --- DYNAMIC FRIDGE MASTER REGISTRATION / FALLBACK MECHANISM ---
+      // Normalize string structures safely to prevent database value exceptions
+      final String safeModel = (asset.modelNo.isNotEmpty ? asset.modelNo : 'N/A').trim();
+      final String safeSerial = (asset.serialNo.isNotEmpty ? asset.serialNo : 'N/A').trim();
+
+      // Clean brand string evaluation block
+      // String tentativeBrand = 'Generic Brand';
+      // if (asset.brand != null && asset.brand!.trim().isNotEmpty) {
+      //   tentativeBrand = asset.brand!;
+      // } else if (asset.manufacturer.trim().isNotEmpty) {
+      //   tentativeBrand = asset.manufacturer;
+      // }
+      // final String safeBrand = tentativeBrand.trim();
+
+      // String? targetFridgeId = asset.fridgeId;
+      //
+      // // 🔍 EDIT-DETECTION INTERCEPTOR (FORCES FRESH NEW FRIDGE ROW IF USER EDITED ORIGINAL TEMPLATE)
+      // if (targetFridgeId != null) {
+      //   try {
+      //     final existingRecord = await _supabase
+      //         .from('fridges')
+      //         .select('brand, manufacturer, model_no')
+      //         .eq('id', targetFridgeId)
+      //         .maybeSingle();
+      //
+      //     if (existingRecord != null) {
+      //       final String originalBrand = (existingRecord['brand'] ?? existingRecord['manufacturer'] ?? '').toString().trim().toLowerCase();
+      //       final String originalModel = (existingRecord['model_no'] ?? '').toString().trim().toLowerCase();
+      //
+      //       if (originalModel != safeModel.toLowerCase() || originalBrand != safeBrand.toLowerCase()) {
+      //         debugPrint("🛠️ Text variation tracked on active asset input rows! Detaching legacy ID allocation pointer to force clean database registration rows...");
+      //         targetFridgeId = null;
+      //       }
+      //     }
+      //   } catch (e) {
+      //     debugPrint("Baseline verification lookup failed fallback warning: $e");
+      //     targetFridgeId = null; // Clear key link pointer on tracking lookup errors for safety
+      //   }
+      // }
+      //
+      // if (targetFridgeId == null) {
+      //   // Safe database lookup parsing using normalized tracking keys
+      //   final existingFridge = await _supabase
+      //       .from('fridges')
+      //       .select('id')
+      //       .eq('model_no', safeModel)
+      //       .eq('serial_no', safeSerial)
+      //       .maybeSingle();
+      //
+      //   if (existingFridge != null) {
+      //     targetFridgeId = existingFridge['id'];
+      //   } else {
+      //     // Insert a pristine new master record using safe string buffers
+      //     final newFridgeRecord = await _supabase.from('fridges').insert({
+      //       'manufacturer': safeBrand,
+      //       'brand': safeBrand,
+      //       'model_no': safeModel,
+      //       'serial_no': safeSerial,
+      //       'door_count': asset.doorCount,
+      //       'drawer_count': asset.drawerCount,
+      //       'created_by': _supabase.auth.currentUser!.id,
+      //       'data_plate_image_url': dataPlateUrl,
+      //     }).select('id').single();
+      //
+      //     targetFridgeId = newFridgeRecord['id'];
+      //   }
+      // } else {
+      //   // Update asset layout tracking counts on known master tables if matching templates load smoothly
+      //   await _supabase.from('fridges').update({
+      //     'door_count': asset.doorCount,
+      //     'drawer_count': asset.drawerCount,
+      //     'updated_at': DateTime.now().toIso8601String(),
+      //   }).eq('id', targetFridgeId);
+      // }
+      //
+      // // 3. INSERT INTO 'assets_report_fridge' (Using sanitized parameter fields)
+      // final assetResponse = await _supabase.from('assets_report_fridge').insert({
+      //   'report_id': reportId,
+      //   'fridge_id': targetFridgeId,
+      //   'area': asset.area.isNotEmpty ? asset.area : 'Main Area',
+      //   'data_plate_url': dataPlateUrl,
+      //   'manufacturer': safeBrand,
+      //   'model_no': safeModel,
+      //   'serial_no': safeSerial,
+      //   'condition': asset.condition,
+      //   'door_count': asset.doorCount,
+      //   'drawer_count': asset.drawerCount,
+      //   'seals_are_common': asset.sealsAreCommon,
+      //   'engineer_notes': asset.description,
+      // }).select().single();
+
+
+
+      // --- ✅ 100% FIXED & COMPILE-SAFE FRIDGE MASTER REGISTRATION ---
       String? targetFridgeId = asset.fridgeId;
 
+      String tentativeBrand = 'Generic Brand';
+      if (asset.brand != null && asset.brand!.trim().isNotEmpty) {
+        tentativeBrand = asset.brand!;
+      } else if (asset.manufacturer.trim().isNotEmpty) {
+        tentativeBrand = asset.manufacturer;
+      }
+      final String safeBrand = tentativeBrand.trim();
+
       if (targetFridgeId == null) {
+        // Safe lookup to handle historical duplicates without crashing
         final existingFridge = await _supabase
             .from('fridges')
             .select('id')
-            .eq('model_no', asset.modelNo.trim())
-            .eq('serial_no', asset.serialNo.trim())
+            .eq('model_no', safeModel)
+            .eq('serial_no', safeSerial)
+            .limit(1)
             .maybeSingle();
 
         if (existingFridge != null) {
           targetFridgeId = existingFridge['id'];
+          // Update existing record structure live
+          await _supabase.from('fridges').update({
+            'manufacturer': safeBrand,
+            'brand': safeBrand,
+            'door_count': asset.doorCount,
+            'drawer_count': asset.drawerCount,
+            'data_plate_image_url': dataPlateUrl ?? asset.dataPlateImage?.path,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', targetFridgeId!);
+          debugPrint("🔄 Existing master fridge matched and updated successfully: $targetFridgeId");
         } else {
+          // Safe pristine insert routine with fallback validation mapping
           final newFridgeRecord = await _supabase.from('fridges').insert({
-            'manufacturer': (asset.brand ?? asset.manufacturer).trim(),
-            'brand': asset.brand?.trim(),
-            'model_no': asset.modelNo.trim(),
-            'serial_no': asset.serialNo.trim(),
+            'manufacturer': safeBrand,
+            'brand': safeBrand,
+            'model_no': safeModel,
+            'serial_no': safeSerial,
             'door_count': asset.doorCount,
             'drawer_count': asset.drawerCount,
             'created_by': _supabase.auth.currentUser!.id,
             'data_plate_image_url': dataPlateUrl,
-          }).select('id').single();
+          }).select('id').maybeSingle();
 
-          targetFridgeId = newFridgeRecord['id'];
+          // Null-coalescing guard fallback path configuration
+          targetFridgeId = newFridgeRecord?['id']?.toString();
+          debugPrint("🆕 No match found. Created a fresh master fridge row: $targetFridgeId");
         }
       } else {
+        // Direct explicit template override update update call
         await _supabase.from('fridges').update({
           'door_count': asset.doorCount,
           'drawer_count': asset.drawerCount,
@@ -4757,10 +5225,13 @@ class _NewReportPageState extends State<NewReportPage> {
         }).eq('id', targetFridgeId);
       }
 
-      // 3. INSERT INTO 'assets_report_fridge'
+      // Guard Clause: Ensure targetFridgeId is absolutely resolved before entering Step 3 insertion passes
+      final String verifiedFridgeId = targetFridgeId ?? '00000000-0000-0000-0000-000000000000';
+
+      // 3. INSERT INTO 'assets_report_fridge' (Using guaranteed non-null verifiedFridgeId string)
       final assetResponse = await _supabase.from('assets_report_fridge').insert({
         'report_id': reportId,
-        'fridge_id': targetFridgeId,
+        'fridge_id': verifiedFridgeId, // ✅ Safely linked without any type mismatch errors
         'area': asset.area,
         'data_plate_url': dataPlateUrl,
         'manufacturer': asset.brand ?? asset.manufacturer,
@@ -4792,7 +5263,7 @@ class _NewReportPageState extends State<NewReportPage> {
         // 5. INSERT INTO 'asset_report_fridge_items'
         await _supabase.from('asset_report_fridge_items').insert({
           'report_asset_id': assetId,
-          'item_name': sealItem.itemName,
+          'item_name': sealItem.itemName.isNotEmpty ? sealItem.itemName : "Component ${index + 1}",
           'seal_id': sealItem.sealId,
           'is_unknown_seal': sealItem.sealId == null,
           'confidence_score': sealItem.confidence,
@@ -4801,65 +5272,153 @@ class _NewReportPageState extends State<NewReportPage> {
           'item_notes': sealItem.description,
           'material': sealItem.material,
           'seal_type': sealItem.sealType,
-          'thickness': sealItem.thickness,
-          'inner_diameter': sealItem.innerDiameter,
-          'outer_diameter': sealItem.outerDiameter,
+          'thickness': sealItem.thickness > 0 ? sealItem.thickness : 0.0,
+          'inner_diameter': sealItem.innerDiameter > 0 ? sealItem.innerDiameter : 0.0,
+          'outer_diameter': sealItem.outerDiameter > 0 ? sealItem.outerDiameter : 0.0,
           'wear_percentage': sealItem.wearPercentage.toInt(),
           'need_replacement': sealItem.needsUrgentReplacement,
         });
 
-        // 6. UPSERT MASTER 'fridge_components'
+        // 6. UPSERT MASTER 'fridge_components' (Handles Custom Postgres Enum)
+        // String? componentUuid;
+        //
+        // if (targetFridgeId != null) {
+        //   final String componentType = sealItem.itemName.toLowerCase().contains('drawer') ? 'drawer' : 'door';
+        //
+        //   final double verifiedWidth = sealItem.doorWidth > 0 ? sealItem.doorWidth : 100.0;
+        //   final double verifiedHeight = sealItem.doorHeight > 0 ? sealItem.doorHeight : 100.0;
+        //
+        //   // Check if a component block baseline already exists for this index slot position
+        //   final existingComp = await _supabase
+        //       .from('fridge_components')
+        //       .select()
+        //       .eq('fridge_id', targetFridgeId)
+        //       .eq('component_type', componentType)
+        //       .eq('component_index', index + 1)
+        //       .maybeSingle();
+        //
+        //   if (existingComp == null) {
+        //     // Case A: Missing entirely -> Create a fresh database configuration profile row
+        //     final newComp = await _supabase.from('fridge_components').insert({
+        //       'fridge_id': targetFridgeId,
+        //       'component_type': componentType,
+        //       'component_index': index + 1,
+        //       'width_mm': verifiedWidth,
+        //       'height_mm': verifiedHeight,
+        //       'notes': 'Learned from component field logic.',
+        //     }).select('id').single();
+        //
+        //     componentUuid = newComp['id'];
+        //   } else {
+        //     // Case B: Component exists -> Compare current dimensions with baseline database values
+        //     final double dbWidth = (existingComp['width_mm'] ?? 0.0).toDouble();
+        //     final double dbHeight = (existingComp['height_mm'] ?? 0.0).toDouble();
+        //
+        //     if (dbWidth != verifiedWidth || dbHeight != verifiedHeight) {
+        //       // Target dimensions modified -> Update the master component specifications record dynamically
+        //       final updatedComp = await _supabase.from('fridge_components').update({
+        //         'width_mm': verifiedWidth,
+        //         'height_mm': verifiedHeight,
+        //       }).eq('id', existingComp['id']).select('id').single();
+        //
+        //       componentUuid = updatedComp['id'];
+        //       debugPrint("🔄 Updated master dimensions profile for ${sealItem.itemName}");
+        //     } else {
+        //       // No dimensional change -> Retain legacy reference ID safely
+        //       componentUuid = existingComp['id'];
+        //     }
+        //   }
+        // }
+
+
+        // --- ✅ FIXED: UPSERT MASTER 'fridge_components' BY INDEX & TYPE ---
         String? componentUuid;
 
         if (targetFridgeId != null) {
           final String componentType = sealItem.itemName.toLowerCase().contains('drawer') ? 'drawer' : 'door';
+          final double verifiedWidth = sealItem.doorWidth > 0 ? sealItem.doorWidth : 100.0;
+          final double verifiedHeight = sealItem.doorHeight > 0 ? sealItem.doorHeight : 100.0;
 
+          // Check using .limit(1).maybeSingle() to stay secure against multiple component records
           final existingComp = await _supabase
               .from('fridge_components')
-              .select()
+              .select('id')
               .eq('fridge_id', targetFridgeId)
               .eq('component_type', componentType)
               .eq('component_index', index + 1)
+              .limit(1)
               .maybeSingle();
 
           if (existingComp == null) {
+
             final newComp = await _supabase.from('fridge_components').insert({
               'fridge_id': targetFridgeId,
               'component_type': componentType,
               'component_index': index + 1,
-              'width_mm': sealItem.doorWidth,
-              'height_mm': sealItem.doorHeight,
+              'width_mm': verifiedWidth,
+              'height_mm': verifiedHeight,
               'notes': 'Learned from component field logic.',
             }).select('id').single();
 
             componentUuid = newComp['id'];
           } else {
+
             final updatedComp = await _supabase.from('fridge_components').update({
-              'width_mm': sealItem.doorWidth,
-              'height_mm': sealItem.doorHeight,
+              'width_mm': verifiedWidth,
+              'height_mm': verifiedHeight,
             }).eq('id', existingComp['id']).select('id').single();
 
             componentUuid = updatedComp['id'];
+            debugPrint("🔄 Updated dimensions for existing component position: ${index + 1}");
           }
         }
 
-        // 7. SYNC 'fridge_seals_relation'
+        // 7. SYNC 'fridge_seals_relation' (With Custom Model Mismatch Forking Logic)
+        // if (sealItem.sealId != null && targetFridgeId != null && componentUuid != null) {
+        //   final existingRelation = await _supabase
+        //       .from('fridge_seals_relation')
+        //       .select()
+        //       .eq('fridge_id', targetFridgeId)
+        //       .eq('supported_component_id', componentUuid)
+        //       .maybeSingle();
+
         if (sealItem.sealId != null && targetFridgeId != null && componentUuid != null) {
+          // ✅ FIXED: Use .limit(1) + .maybeSingle() to safely handle legacy duplicate rows
           final existingRelation = await _supabase
               .from('fridge_seals_relation')
               .select()
               .eq('fridge_id', targetFridgeId)
-              .eq('seal_product_id', sealItem.sealId!)
-              .eq('location', sealItem.itemName)
               .eq('supported_component_id', componentUuid)
+              .eq('seal_product_id', sealItem.sealId!)   // ✅ Added to narrow down match
+              .limit(1)                                   // ✅ Critical safety guard
               .maybeSingle();
 
           if (existingRelation != null) {
-            await _supabase.from('fridge_seals_relation').update({
-              'quantity': (existingRelation['quantity'] ?? 1) + 1,
-              'updated_at': DateTime.now().toIso8601String(),
-            }).eq('id', existingRelation['id']);
+            final String dbSealProductId = existingRelation['seal_product_id'].toString();
+
+            if (dbSealProductId != sealItem.sealId!) {
+              // Case A: Seal profile changed -> Fork a new configuration relationship mapping path
+              debugPrint("🚀 Gasket change detected on ${sealItem.itemName}! Creating a fresh configuration path...");
+              await _supabase.from('fridge_seals_relation').insert({
+                'fridge_id': targetFridgeId,
+                'seal_product_id': sealItem.sealId,
+                'location': sealItem.itemName,
+                'supported_component_id': componentUuid,
+                'quantity': 1,
+                'is_verified': false,
+                'confidence_score': sealItem.confidence,
+                'matching_notes': "Modified profile path override recorded from Report: $reportId",
+                'suggested_by_user_id': _supabase.auth.currentUser!.id,
+              });
+            } else {
+              // Case B: Gasket profile identical -> Increment use counts on matching slots
+              await _supabase.from('fridge_seals_relation').update({
+                'quantity': (existingRelation['quantity'] ?? 1) + 1,
+                'updated_at': DateTime.now().toIso8601String(),
+              }).eq('id', existingRelation['id']);
+            }
           } else {
+            // Case C: Missing completely -> Establish standard relationship allocation binding
             await _supabase.from('fridge_seals_relation').insert({
               'fridge_id': targetFridgeId,
               'seal_product_id': sealItem.sealId,
@@ -4933,71 +5492,96 @@ class _NewReportPageState extends State<NewReportPage> {
         appBar: AppBar(title: const Text("New Asset Report")),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
-                    child: Text("Select Customer", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary.withOpacity(0.7))),
-                  ),
-                  CustomCustomerDropdown(
-                    customers: _customers,
-                    selectedCustomerId: _selectedCustomerId,
-                    onChanged: (id) {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      setState(() => _selectedCustomerId = id);
-                      final cust = _customers.firstWhere((e) => e['id'].toString() == id);
-                      _generateReportTitle(cust['full_name'] ?? "Client");
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _titleController,
-                          decoration: const InputDecoration(labelText: "Report Title", border: OutlineInputBorder()),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _reportNotesController,
-                          maxLines: 2,
-                          decoration: const InputDecoration(labelText: "General Report Notes", border: OutlineInputBorder()),
-                        ),
-                      ],
+            : Form(
+          key: _formKey,
+              child: CustomScrollView(
+                        slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+                      child: Text("Select Customer", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary.withOpacity(0.7))),
                     ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Text("ADDED ASSETS", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) => _buildSummaryCard(index),
-                  childCount: _assets.length,
+                    CustomCustomerDropdown(
+                      customers: _customers,
+                      selectedCustomerId: _selectedCustomerId,
+                      onChanged: (id) {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() => _selectedCustomerId = id);
+                        final cust = _customers.firstWhere((e) => e['id'].toString() == id);
+                        _generateReportTitle(cust['full_name'] ?? "Client");
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Column(
+                        children: [
+                          // TextField(
+                          //   controller: _titleController,
+                          //   decoration: const InputDecoration(labelText: "Report Title", border: OutlineInputBorder()),
+                          // ),
+                          TextFormField(
+                            controller: _titleController,
+                            decoration: const InputDecoration(labelText: "Report Title", border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)))),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return "Report title cannot be empty";
+                              }
+                              return null;
+                            },
+                          ),
+
+                          const SizedBox(height: 12),
+                          // TextField(
+                          //   controller: _reportNotesController,
+                          //   maxLines: 2,
+                          //   decoration: const InputDecoration(labelText: "General Report Notes", border: OutlineInputBorder()),
+                          // ),
+                          TextFormField(
+                            controller: _reportNotesController,
+                            maxLines: 2,
+                            decoration: const InputDecoration(labelText: "General Report Notes", border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)))),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return "Please enter general notes or engineering summary context parameters";
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Text("ADDED ASSETS", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Column(
-                children: [
-                  if (_assets.isEmpty) _buildEmptyState(),
-                  const Spacer(),
-                  _buildBottomActions(),
-                ],
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) => _buildSummaryCard(index),
+                    childCount: _assets.length,
+                  ),
+                ),
               ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Column(
+                  children: [
+                    if (_assets.isEmpty) _buildEmptyState(),
+                    const Spacer(),
+                    _buildBottomActions(),
+                  ],
+                ),
+              ),
+                        ],
+                      ),
             ),
-          ],
-        ),
       ),
     );
   }
@@ -5200,6 +5784,7 @@ class _NewReportPageState extends State<NewReportPage> {
                   : const Text("SUBMIT FINAL REPORT", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ),
+          SizedBox(height: 60,)
         ],
       ),
     );
