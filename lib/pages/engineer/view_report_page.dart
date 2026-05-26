@@ -2954,6 +2954,7 @@ class _ViewReportPageState extends State<ViewReportPage> {
       // 3. Fallback: Online query to Supabase with full component join
       final onlineData = await _supabase.from('asset_reports').select('''
           *,
+          gg_number,
           customer:user_profiles!customer_id(full_name, email),
           fridges:assets_report_fridge(
             *,
@@ -3279,6 +3280,25 @@ class _ViewReportPageState extends State<ViewReportPage> {
               ),
             ],
           ),
+
+          // ✅ ADDED: GG NUMBER COMPULSORY IDENTIFIER METADATA STRIP
+          if (_report!['gg_number'] != null && _report!['gg_number'].toString().isNotEmpty) ...[
+            const Divider(height: 30),
+            const Text("GG IDENTIFICATION NUMBER", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+              ),
+              child: Text(
+                  _report!['gg_number'].toString().toUpperCase(),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8)
+              ),
+            ),
+          ],
           if (_report!['notes'] != null &&
               _report!['notes'].toString().isNotEmpty) ...[
             const Divider(height: 30),

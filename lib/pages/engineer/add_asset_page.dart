@@ -4781,6 +4781,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
   // Form controllers
   final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _ggNumberController = TextEditingController();
   final TextEditingController _brandController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   final TextEditingController _serialController = TextEditingController();
@@ -4813,6 +4814,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
   void dispose() {
     _scanController.dispose();
     _locationController.dispose();
+    _ggNumberController.dispose();
     _brandController.dispose();
     _modelController.dispose();
     _serialController.dispose();
@@ -6245,6 +6247,27 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                       return null;
                     },
                   ),
+                  const SizedBox(height: 12),
+
+                  // ✅ NEW: GG NUMBER TEXTFORMFIELD MOUNTED INLINE WITH VALIDATION
+                  TextFormField(
+                    controller: _ggNumberController,
+                    keyboardType: TextInputType.text,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: "GG Number *",
+                      hintText: "Enter asset GG identification number",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                      errorStyle: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onChanged: (val) => _entry.ggNumber = val.trim().toUpperCase(),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return "GG Number is compulsory for record compliance.";
+                      }
+                      return null;
+                    },
+                  ),
 
                   // _buildSectionTitle("2. FRIDGE DATA PLATE"),
                   // _buildDataPlatePicker(),
@@ -6634,6 +6657,8 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                         }
 
                         // Update parent configuration headers
+                        _entry.area = _locationController.text.trim();
+                        _entry.ggNumber = _ggNumberController.text.trim().toUpperCase();
                         _entry.modelNo = _modelController.text;
                         _entry.serialNo = _serialController.text;
                         _entry.brand = _brandController.text;
@@ -7574,6 +7599,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
       // Update text controllers for main fields cleanly
       _locationController.text = _entry.area;
+      _ggNumberController.text = _entry.ggNumber;
       _brandController.text = _entry.brand ?? '';
       _modelController.text = _entry.modelNo;
       _serialController.text = _entry.serialNo;

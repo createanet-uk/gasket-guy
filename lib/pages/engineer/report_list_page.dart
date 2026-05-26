@@ -2741,6 +2741,8 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
+import 'package:mobile/components/seal_detection_component.dart';
+import 'package:mobile/pages/engineer/seal_detection_page.dart';
 import 'package:mobile/pages/engineer/view_report_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -2750,6 +2752,7 @@ import '../../../theme.dart';
 import '../auth_page.dart';
 import 'local_database_pages.dart';
 import 'new_report_page.dart';
+
 
 class ReportListPage extends StatefulWidget {
   const ReportListPage({super.key});
@@ -2956,6 +2959,7 @@ class _ReportListPageState extends State<ReportListPage> {
           .from('asset_reports')
           .select('''
           *,
+          gg_number,
           customer:user_profiles!customer_id(full_name, email),
           fridges:assets_report_fridge(
             *,
@@ -3431,6 +3435,22 @@ class _ReportListPageState extends State<ReportListPage> {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const LocalSealsPage()));
                 },
               ),
+
+              // Menu Item 4: Detect Seal Page Hook
+              _buildDrawerMenuItem(
+                icon: Icons.camera_alt_outlined,
+                title: "Detect Seal",
+                onTap: () {
+                  Navigator.pop(context);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HomePage(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -3521,6 +3541,19 @@ class _ReportListPageState extends State<ReportListPage> {
                               Text(customer, style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
                             ],
                           ),
+                          if (report['gg_number'] != null && report['gg_number'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(Icons.tag_rounded, size: 14, color: AppTheme.primary.withOpacity(0.7)),
+                                const SizedBox(width: 4),
+                                Text(
+                                    "GG NO: ${report['gg_number']}",
+                                    style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)
+                                ),
+                              ],
+                            ),
+                          ],
                           const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3665,6 +3698,8 @@ class _ReportListPageState extends State<ReportListPage> {
   }) async {
     const String bucketName = 'engineer-uploads';
 
+    final String baselineGgNumber = assets.isNotEmpty ? assets.first.ggNumber.trim().toUpperCase() : '';
+
     // 1. INSERT REPORT HEADER
     final reportHeader = await _supabase.from('asset_reports').insert({
       'customer_id': customerId,
@@ -3672,6 +3707,7 @@ class _ReportListPageState extends State<ReportListPage> {
       'report_title': title,
       'notes': notes,
       'status': 'submitted',
+      'gg_number': baselineGgNumber,
     }).select().single();
 
     final String reportId = reportHeader['id'];

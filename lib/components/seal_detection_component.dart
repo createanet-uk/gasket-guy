@@ -1413,6 +1413,636 @@
 //   Widget _buildHandle() => Container(margin: const EdgeInsets.only(top: 12), height: 4, width: 40, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)));
 // }
 
+//
+// import 'dart:io';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:image_picker/image_picker.dart';
+// import 'package:tflite_flutter/tflite_flutter.dart';
+// import 'package:image/image.dart' as img;
+// import 'package:shared_preferences/shared_preferences.dart';
+// import '../theme.dart';
+// import '../vision/rubber_camera_detector.dart';
+// import 'image_previewer.dart';
+//
+// /// --- DATA MODELS (Top level to prevent lookup errors) ---
+// class SealDetectionResult {
+//   final String label;
+//   final double confidence;
+//   final List<File> images;
+//
+//   SealDetectionResult({
+//     required this.label,
+//     required this.confidence,
+//     required this.images,
+//   });
+// }
+//
+// class PredictionResult {
+//   final String label;
+//   final double confidence;
+//   PredictionResult(this.label, this.confidence);
+// }
+//
+// class SealDetectionComponent extends StatefulWidget {
+//   const SealDetectionComponent({super.key});
+//
+//   @override
+//   State<SealDetectionComponent> createState() => _SealDetectionComponentState();
+// }
+//
+// class _SealDetectionComponentState extends State<SealDetectionComponent> {
+//   List<File> imageFiles = [];
+//   List<PredictionResult> topPredictions = [];
+//   PredictionResult? selectedResult;
+//
+//   String statusMessage = "Add images to start analysis";
+//   bool isBusy = false;
+//   bool isModelLoaded = false;
+//   bool isInitializing = false;
+//   bool isUnmatched = false;
+//
+//   Interpreter? interpreter;
+//   List<String> labels = [];
+//   List<int>? inputShape;
+//
+//   final int maxImageLimit = 5;
+//   final double matchThreshold = 0.50;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initApp();
+//   }
+//
+//   @override
+//   void dispose() {
+//     interpreter?.close();
+//     super.dispose();
+//   }
+//
+//   Future<void> _initApp() async {
+//     setState(() {
+//       isInitializing = true;
+//       statusMessage = "Initializing AI...";
+//     });
+//     await _loadModelAndLabels();
+//     if (mounted) setState(() => isInitializing = false);
+//   }
+//
+//   Future<void> _loadModelAndLabels() async {
+//     try {
+//       final prefs = await SharedPreferences.getInstance();
+//       final String? savedModelPath = prefs.getString('current_model_path');
+//       final String? savedLabelsPath = prefs.getString('current_labels_path');
+//
+//       if (savedLabelsPath != null && File(savedLabelsPath).existsSync()) {
+//         final data = await File(savedLabelsPath).readAsString();
+//         labels = data.split('\n').where((e) => e.trim().isNotEmpty).toList();
+//       } else {
+//         final data = await rootBundle.loadString('assets/model1/labels.txt');
+//         labels = data.split('\n').where((e) => e.trim().isNotEmpty).toList();
+//       }
+//
+//       if (savedModelPath != null && File(savedModelPath).existsSync()) {
+//         interpreter = await Interpreter.fromFile(File(savedModelPath));
+//       } else {
+//         interpreter = await Interpreter.fromAsset('assets/model1/model.tflite');
+//       }
+//
+//       if (interpreter != null) {
+//         inputShape = interpreter!.getInputTensor(0).shape;
+//         if (mounted) {
+//           setState(() {
+//             isModelLoaded = true;
+//             statusMessage = "AI System Ready";
+//           });
+//         }
+//       }
+//     } catch (e) {
+//       if (mounted) setState(() => statusMessage = "Model Load Error");
+//     }
+//   }
+//
+//   Future<void> _runInference() async {
+//     if (imageFiles.isEmpty || !isModelLoaded) return;
+//     setState(() {
+//       isBusy = true;
+//       statusMessage = "Analyzing Geometry...";
+//     });
+//
+//     try {
+//       List<List<double>> allScores = [];
+//       for (var file in imageFiles) {
+//         final bytes = await file.readAsBytes();
+//         img.Image? originalImage = img.decodeImage(bytes);
+//         if (originalImage == null) continue;
+//
+//         int h = inputShape![1];
+//         int w = inputShape![2];
+//         img.Image resized = img.copyResize(originalImage, width: w, height: h);
+//
+//         var input = List.generate(1, (_) => List.generate(h, (y) => List.generate(w, (x) {
+//           final pixel = resized.getPixel(x, y);
+//           return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+//         })));
+//
+//         var output = List.generate(1, (_) => List.filled(labels.length, 0.0));
+//         interpreter!.run(input, output);
+//         allScores.add(List<double>.from(output[0]));
+//       }
+//
+//       List<double> avg = List.filled(labels.length, 0.0);
+//       for (int i = 0; i < labels.length; i++) {
+//         double sum = 0;
+//         for (var score in allScores) sum += score[i];
+//         avg[i] = sum / allScores.length;
+//       }
+//
+//       List<PredictionResult> res = [];
+//       for (int i = 0; i < labels.length; i++) {
+//         res.add(PredictionResult(labels[i], avg[i]));
+//       }
+//       res.sort((a, b) => b.confidence.compareTo(a.confidence));
+//
+//       if (mounted) {
+//         setState(() {
+//           isBusy = false;
+//           if (res.isEmpty || res[0].confidence < matchThreshold) {
+//             isUnmatched = true;
+//             statusMessage = "No Match Found";
+//           } else {
+//             isUnmatched = false;
+//             statusMessage = "Verify Identification";
+//             topPredictions = res.take(3).toList();
+//             selectedResult = topPredictions[0];
+//           }
+//         });
+//       }
+//     } catch (e) {
+//       if (mounted) setState(() { isBusy = false; statusMessage = "Analysis Failed"; });
+//     }
+//   }
+//
+//   void _confirmSelection() {
+//     if (selectedResult == null) return;
+//     Navigator.pop(context, SealDetectionResult(
+//       label: selectedResult!.label,
+//       confidence: selectedResult!.confidence,
+//       images: List.from(imageFiles),
+//     ));
+//   }
+//
+//   // void _addImage(ImageSource source) async {
+//   //   final picker = ImagePicker();
+//   //   if (source == ImageSource.gallery) {
+//   //     final List<XFile> picked = await picker.pickMultiImage();
+//   //     if (picked.isNotEmpty) {
+//   //       setState(() {
+//   //         imageFiles.addAll(picked.map((x) => File(x.path)));
+//   //         if (imageFiles.length > maxImageLimit) imageFiles = imageFiles.sublist(0, maxImageLimit);
+//   //         _resetStatus();
+//   //       });
+//   //     }
+//   //   } else {
+//   //     final XFile? picked = await picker.pickImage(source: source);
+//   //     if (picked != null) {
+//   //       setState(() {
+//   //         imageFiles.add(File(picked.path));
+//   //         _resetStatus();
+//   //       });
+//   //     }
+//   //   }
+//   // }
+//
+//   Future<void> addImage(ImageSource source) async {
+//     if (imageFiles.length >= maxImageLimit) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text("Maximum 5 images are allowed.")),
+//       );
+//       return;
+//     }
+//
+//     final picker = ImagePicker();
+//
+//     if (source == ImageSource.gallery) {
+//       try {
+//         int remainingSlots = maxImageLimit - imageFiles.length;
+//         final List<XFile> pickedFiles = await picker.pickMultiImage();
+//
+//         if (pickedFiles.isEmpty) return;
+//
+//         setState(() {
+//           if (pickedFiles.length > remainingSlots) {
+//             _showLimitWarning(pickedFiles.length, remainingSlots);
+//           }
+//
+//           var filesToAdd = pickedFiles
+//               .take(remainingSlots)
+//               .map((xFile) => File(xFile.path));
+//           imageFiles.addAll(filesToAdd);
+//
+//           isUnmatched = false;
+//           topPredictions = [];
+//           statusMessage = "${imageFiles.length} profiles ready for analysis";
+//         });
+//       } catch (e) {
+//         debugPrint("Gallery error: $e");
+//       }
+//     } else {
+//       final result = await Navigator.push(
+//         context,
+//         MaterialPageRoute(
+//           builder: (_) => const RubberCameraDetectorPage(),
+//         ),
+//       );
+//
+//       if (result == null) return;
+//
+//       List<File> newFiles = [];
+//       if (result is List) {
+//         for (var item in result) {
+//           if (item is Map && item['path'] != null) {
+//             newFiles.add(File(item['path'].toString()));
+//           }
+//         }
+//       } else if (result is File) {
+//         newFiles.add(result);
+//       } else if (result is String) {
+//         newFiles.add(File(result));
+//       } else if (result is Map && result['path'] != null) {
+//         newFiles.add(File(result['path'].toString()));
+//       }
+//
+//       if (newFiles.isNotEmpty) {
+//         setState(() {
+//           int remainingSlots = maxImageLimit - imageFiles.length;
+//           if (newFiles.length > remainingSlots) {
+//             _showLimitWarning(newFiles.length, remainingSlots);
+//           }
+//
+//           imageFiles.addAll(newFiles.take(remainingSlots));
+//           isUnmatched = false;
+//           topPredictions = [];
+//           statusMessage = "${imageFiles.length} profiles ready for analysis";
+//         });
+//       }
+//     }
+//   }
+//
+//   void _showLimitWarning(int attempted, int allowed) {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         title: const Row(
+//           children: [
+//             Icon(Icons.warning_amber_rounded, color: Colors.orange),
+//             SizedBox(width: 10),
+//             Text("Limit Warning"),
+//           ],
+//         ),
+//         content: Text(
+//           "You selected $attempted images, but only $allowed slots are available (Max: 5).",
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: const Text("Okay"),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//
+//   void _resetStatus() {
+//     isUnmatched = false;
+//     topPredictions = [];
+//     selectedResult = null;
+//     statusMessage = "${imageFiles.length} photos ready";
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       height: MediaQuery.of(context).size.height * 0.9,
+//       decoration: const BoxDecoration(
+//         color: AppTheme.primaryBackground,
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+//       ),
+//       child: Column(
+//         children: [
+//           _buildHandle(),
+//           const SizedBox(height: 10),
+//           _buildHeader(),
+//           Expanded(
+//             child: SingleChildScrollView(
+//               physics: const BouncingScrollPhysics(),
+//               padding: const EdgeInsets.symmetric(horizontal: 20),
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.stretch,
+//                 children: [
+//                   const SizedBox(height: 20),
+//                   _buildImageGallery(),
+//                   const SizedBox(height: 24),
+//                   _buildMainContent(), // Unified content management
+//                   const SizedBox(height: 40),
+//                 ],
+//               ),
+//             ),
+//           ),
+//           _buildBottomActions(),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   /// --- FIX: This logic now properly checks imageFiles.isEmpty ---
+//   Widget _buildMainContent() {
+//     if (isBusy || isInitializing) {
+//       return _buildLoadingState();
+//     }
+//
+//     if (imageFiles.isEmpty) {
+//       return _buildEmptyState();
+//     }
+//
+//     if (isUnmatched) {
+//       return _buildErrorCard();
+//     }
+//
+//     if (topPredictions.isNotEmpty) {
+//       return Column(
+//         children: topPredictions.map((res) => _buildSelectableResult(res)).toList(),
+//       );
+//     }
+//
+//     // Default "waiting for analysis" state after images are added
+//     return Container(
+//       padding: const EdgeInsets.all(24),
+//       decoration: BoxDecoration(
+//           color: Colors.white,
+//           borderRadius: BorderRadius.circular(20),
+//           border: Border.all(color: AppTheme.primary.withOpacity(0.1))
+//       ),
+//       child: Column(
+//         children: [
+//           Icon(Icons.insights_rounded, color: AppTheme.primary.withOpacity(0.5), size: 32),
+//           const SizedBox(height: 12),
+//           const Text(
+//             "Tap 'RUN ANALYSIS' to identify the seal profile",
+//             textAlign: TextAlign.center,
+//             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.blueGrey),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildHeader() {
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(horizontal: 24),
+//       child: Row(
+//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//         children: [
+//           Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               const Text("Seal Identifier", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+//               Text(statusMessage, style: TextStyle(color: isUnmatched ? Colors.red : AppTheme.primary, fontWeight: FontWeight.w600, fontSize: 13)),
+//             ],
+//           ),
+//           IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.grey)),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildLoadingState() {
+//     return Column(
+//       children: [
+//         const SizedBox(height: 60),
+//         const CircularProgressIndicator(strokeWidth: 3),
+//         const SizedBox(height: 20),
+//         Text("AI is processing images...", style: TextStyle(color: Colors.grey[600])),
+//       ],
+//     );
+//   }
+//
+//   Widget _buildEmptyState() {
+//     return Container(
+//       padding: const EdgeInsets.all(40),
+//       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey[200]!)),
+//       child: Column(
+//         children: [
+//           Icon(Icons.photo_library_outlined, size: 48, color: Colors.grey[300]),
+//           const SizedBox(height: 12),
+//           const Text("No profile photos yet", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildSelectableResult(PredictionResult res) {
+//     bool isSelected = selectedResult?.label == res.label;
+//     double percent = res.confidence * 100;
+//
+//     return GestureDetector(
+//       onTap: () => setState(() => selectedResult = res),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 200),
+//         margin: const EdgeInsets.only(bottom: 16),
+//         decoration: BoxDecoration(
+//           color: isSelected ? AppTheme.primary.withOpacity(0.08) : Colors.white,
+//           borderRadius: BorderRadius.circular(20),
+//           border: Border.all(color: isSelected ? AppTheme.primary : Colors.grey[200]!, width: isSelected ? 2 : 1),
+//           boxShadow: isSelected ? [BoxShadow(color: AppTheme.primary.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))] : [],
+//         ),
+//         child: Padding(
+//           padding: const EdgeInsets.all(16),
+//           child: Row(
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.all(10),
+//                 decoration: BoxDecoration(color: isSelected ? AppTheme.primary : Colors.grey[100], shape: BoxShape.circle),
+//                 child: Icon(isSelected ? Icons.check : Icons.fingerprint, color: isSelected ? Colors.white : Colors.grey, size: 20),
+//               ),
+//               const SizedBox(width: 16),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(res.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+//                     const SizedBox(height: 4),
+//                     LinearProgressIndicator(value: res.confidence, backgroundColor: Colors.grey[200], color: isSelected ? AppTheme.primary : Colors.blueGrey, minHeight: 4),
+//                   ],
+//                 ),
+//               ),
+//               const SizedBox(width: 16),
+//               Text("${percent.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, color: isSelected ? AppTheme.primary : Colors.grey[600])),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _buildImageGallery() {
+//     if (imageFiles.isEmpty) return const SizedBox.shrink();
+//     return SizedBox(
+//       height: 120,
+//       // child: ListView.builder(
+//       //   scrollDirection: Axis.horizontal,
+//       //   itemCount: imageFiles.length,
+//       //   itemBuilder: (context, index) => Container(
+//       //     width: 110,
+//       //     margin: const EdgeInsets.only(right: 12),
+//       //     child: Stack(
+//       //       children: [
+//       //         Positioned.fill(
+//       //           child: ClipRRect(
+//       //             borderRadius: BorderRadius.circular(16),
+//       //             child: Image.file(imageFiles[index], fit: BoxFit.cover),
+//       //           ),
+//       //         ),
+//       //         Positioned(
+//       //           top: 5, right: 5,
+//       //           child: GestureDetector(
+//       //             onTap: () => setState(() => imageFiles.removeAt(index)),
+//       //             child: Container(
+//       //               padding: const EdgeInsets.all(4),
+//       //               decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+//       //               child: const Icon(Icons.close, size: 14, color: Colors.white),
+//       //             ),
+//       //           ),
+//       //         ),
+//       //       ],
+//       //     ),
+//       //   ),
+//       // ),
+//       child: ListView.builder(
+//         scrollDirection: Axis.horizontal,
+//         itemCount: imageFiles.length,
+//         itemBuilder: (context, index) => Container(
+//           width: 110,
+//           margin: const EdgeInsets.only(right: 12),
+//           child: Stack(
+//             children: [
+//               // 1. THE IMAGE PREVIEWER
+//               Positioned.fill(
+//                 child: ImagePreviewer(
+//                   file: imageFiles[index],
+//                   galleryItems: imageFiles, // Enables swiping through all picked files
+//                   initialIndex: index,
+//                   width: 110,
+//                   height: 110,
+//                   fit: BoxFit.cover,
+//                   borderRadius: BorderRadius.circular(16),
+//                 ),
+//               ),
+//
+//               // 2. THE DELETE BUTTON (Kept on top of the previewer)
+//               Positioned(
+//                 top: 8, // Slightly adjusted for better alignment with the new radius
+//                 right: 8,
+//                 child: GestureDetector(
+//                   onTap: () => setState(() => imageFiles.removeAt(index)),
+//                   child: Container(
+//                     padding: const EdgeInsets.all(4),
+//                     decoration: BoxDecoration(
+//                       color: Colors.black.withOpacity(0.6),
+//                       shape: BoxShape.circle,
+//                     ),
+//                     child: const Icon(Icons.close, size: 14, color: Colors.white),
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _buildBottomActions() {
+//     return Container(
+//       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+//       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))]),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           if (imageFiles.length < maxImageLimit && !isBusy)
+//             Row(children: [
+//               Expanded(
+//                 child: _actionButton(
+//                   icon: Icons.camera_alt_rounded,
+//                   label: "Camera",
+//                   onPressed: () => addImage(ImageSource.camera),
+//                   isPrimary: false,
+//                 ),
+//               ),
+//               const SizedBox(width: 12),
+//               Expanded(
+//                 child: _actionButton(
+//                   icon: Icons.photo_library_rounded,
+//                   label: "Gallery",
+//                   onPressed: () => addImage(ImageSource.gallery),
+//                   isPrimary: false,
+//                 ),
+//               ),
+//             ]),
+//           const SizedBox(height: 12),
+//           if (imageFiles.isNotEmpty)
+//             SizedBox(
+//               width: double.infinity,
+//               child: _actionButton(
+//                 icon: selectedResult != null ? Icons.verified_user_rounded : Icons.analytics_rounded,
+//                 label: selectedResult != null ? "CONFIRM SELECTION" : "RUN ANALYSIS",
+//                 onPressed: selectedResult != null ? _confirmSelection : _runInference,
+//                 isPrimary: true,
+//                 color: selectedResult != null ? Colors.green[600] : AppTheme.primary,
+//               ),
+//             ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _actionButton({required IconData icon, required String label, required VoidCallback onPressed, bool isPrimary = true, Color? color}) {
+//     return ElevatedButton.icon(
+//       onPressed: onPressed,
+//       icon: Icon(icon, size: 18),
+//       label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+//       style: ElevatedButton.styleFrom(
+//         backgroundColor: isPrimary ? (color ?? AppTheme.primary) : Colors.grey[100],
+//         foregroundColor: isPrimary ? Colors.white : Colors.black87,
+//         elevation: 0,
+//         padding: const EdgeInsets.symmetric(vertical: 16),
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//       ),
+//     );
+//   }
+//
+//   Widget _buildErrorCard() {
+//     return Container(
+//       padding: const EdgeInsets.all(24),
+//       decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.red[100]!)),
+//       child: Column(
+//         children: [
+//           const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
+//           const SizedBox(height: 12),
+//           const Text("No Reliable Match", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)),
+//           const SizedBox(height: 4),
+//           Text("The AI couldn't find a strong match. Try different angles or lighting.", textAlign: TextAlign.center, style: TextStyle(color: Colors.red[900], fontSize: 12)),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildHandle() => Container(margin: const EdgeInsets.only(top: 12), height: 4, width: 40, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)));
+// }
+
+
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -1425,7 +2055,7 @@ import '../theme.dart';
 import '../vision/rubber_camera_detector.dart';
 import 'image_previewer.dart';
 
-/// --- DATA MODELS (Top level to prevent lookup errors) ---
+/// --- DATA MODELS ---
 class SealDetectionResult {
   final String label;
   final double confidence;
@@ -1466,7 +2096,6 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
   List<String> labels = [];
   List<int>? inputShape;
 
-  final int maxImageLimit = 5;
   final double matchThreshold = 0.50;
 
   @override
@@ -1480,6 +2109,10 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
     interpreter?.close();
     super.dispose();
   }
+
+  // =============================================
+  // INIT & MODEL LOADING
+  // =============================================
 
   Future<void> _initApp() async {
     setState(() {
@@ -1524,8 +2157,13 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
     }
   }
 
+  // =============================================
+  // INFERENCE
+  // =============================================
+
   Future<void> _runInference() async {
     if (imageFiles.isEmpty || !isModelLoaded) return;
+
     setState(() {
       isBusy = true;
       statusMessage = "Analyzing Geometry...";
@@ -1533,8 +2171,15 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
 
     try {
       List<List<double>> allScores = [];
-      for (var file in imageFiles) {
-        final bytes = await file.readAsBytes();
+
+      for (int idx = 0; idx < imageFiles.length; idx++) {
+        if (mounted) {
+          setState(() {
+            statusMessage = "Processing image ${idx + 1} of ${imageFiles.length}...";
+          });
+        }
+
+        final bytes = await imageFiles[idx].readAsBytes();
         img.Image? originalImage = img.decodeImage(bytes);
         if (originalImage == null) continue;
 
@@ -1542,10 +2187,20 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
         int w = inputShape![2];
         img.Image resized = img.copyResize(originalImage, width: w, height: h);
 
-        var input = List.generate(1, (_) => List.generate(h, (y) => List.generate(w, (x) {
-          final pixel = resized.getPixel(x, y);
-          return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
-        })));
+        var input = List.generate(
+          1,
+              (_) => List.generate(
+            h,
+                (y) => List.generate(w, (x) {
+              final pixel = resized.getPixel(x, y);
+              return [
+                pixel.r / 255.0,
+                pixel.g / 255.0,
+                pixel.b / 255.0,
+              ];
+            }),
+          ),
+        );
 
         var output = List.generate(1, (_) => List.filled(labels.length, 0.0));
         interpreter!.run(input, output);
@@ -1570,6 +2225,8 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
           isBusy = false;
           if (res.isEmpty || res[0].confidence < matchThreshold) {
             isUnmatched = true;
+            topPredictions = [];
+            selectedResult = null;
             statusMessage = "No Match Found";
           } else {
             isUnmatched = false;
@@ -1580,76 +2237,52 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { isBusy = false; statusMessage = "Analysis Failed"; });
+      if (mounted) {
+        setState(() {
+          isBusy = false;
+          statusMessage = "Analysis Failed";
+        });
+      }
     }
   }
+
+  // =============================================
+  // CONFIRM SELECTION
+  // =============================================
 
   void _confirmSelection() {
     if (selectedResult == null) return;
-    Navigator.pop(context, SealDetectionResult(
-      label: selectedResult!.label,
-      confidence: selectedResult!.confidence,
-      images: List.from(imageFiles),
-    ));
+    Navigator.pop(
+      context,
+      SealDetectionResult(
+        label: selectedResult!.label,
+        confidence: selectedResult!.confidence,
+        images: List.from(imageFiles),
+      ),
+    );
   }
 
-  // void _addImage(ImageSource source) async {
-  //   final picker = ImagePicker();
-  //   if (source == ImageSource.gallery) {
-  //     final List<XFile> picked = await picker.pickMultiImage();
-  //     if (picked.isNotEmpty) {
-  //       setState(() {
-  //         imageFiles.addAll(picked.map((x) => File(x.path)));
-  //         if (imageFiles.length > maxImageLimit) imageFiles = imageFiles.sublist(0, maxImageLimit);
-  //         _resetStatus();
-  //       });
-  //     }
-  //   } else {
-  //     final XFile? picked = await picker.pickImage(source: source);
-  //     if (picked != null) {
-  //       setState(() {
-  //         imageFiles.add(File(picked.path));
-  //         _resetStatus();
-  //       });
-  //     }
-  //   }
-  // }
+  // =============================================
+  // IMAGE MANAGEMENT (No limit)
+  // =============================================
 
-  Future<void> addImage(ImageSource source) async {
-    if (imageFiles.length >= maxImageLimit) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Maximum 5 images are allowed.")),
-      );
-      return;
-    }
-
+  Future<void> _addImage(ImageSource source) async {
     final picker = ImagePicker();
 
     if (source == ImageSource.gallery) {
       try {
-        int remainingSlots = maxImageLimit - imageFiles.length;
         final List<XFile> pickedFiles = await picker.pickMultiImage();
-
         if (pickedFiles.isEmpty) return;
 
         setState(() {
-          if (pickedFiles.length > remainingSlots) {
-            _showLimitWarning(pickedFiles.length, remainingSlots);
-          }
-
-          var filesToAdd = pickedFiles
-              .take(remainingSlots)
-              .map((xFile) => File(xFile.path));
-          imageFiles.addAll(filesToAdd);
-
-          isUnmatched = false;
-          topPredictions = [];
-          statusMessage = "${imageFiles.length} profiles ready for analysis";
+          imageFiles.addAll(pickedFiles.map((xFile) => File(xFile.path)));
+          _resetStatus();
         });
       } catch (e) {
         debugPrint("Gallery error: $e");
       }
     } else {
+      // Camera — navigate to custom camera page
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -1676,51 +2309,33 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
 
       if (newFiles.isNotEmpty) {
         setState(() {
-          int remainingSlots = maxImageLimit - imageFiles.length;
-          if (newFiles.length > remainingSlots) {
-            _showLimitWarning(newFiles.length, remainingSlots);
-          }
-
-          imageFiles.addAll(newFiles.take(remainingSlots));
-          isUnmatched = false;
-          topPredictions = [];
-          statusMessage = "${imageFiles.length} profiles ready for analysis";
+          imageFiles.addAll(newFiles);
+          _resetStatus();
         });
       }
     }
   }
 
-  void _showLimitWarning(int attempted, int allowed) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange),
-            SizedBox(width: 10),
-            Text("Limit Warning"),
-          ],
-        ),
-        content: Text(
-          "You selected $attempted images, but only $allowed slots are available (Max: 5).",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Okay"),
-          ),
-        ],
-      ),
-    );
-  }
-
-
   void _resetStatus() {
     isUnmatched = false;
     topPredictions = [];
     selectedResult = null;
-    statusMessage = "${imageFiles.length} photos ready";
+    statusMessage = "${imageFiles.length} photo${imageFiles.length > 1 ? 's' : ''} ready";
   }
+
+  void _removeImage(int index) {
+    setState(() {
+      imageFiles.removeAt(index);
+      _resetStatus();
+      if (imageFiles.isEmpty) {
+        statusMessage = "Add images to start analysis";
+      }
+    });
+  }
+
+  // =============================================
+  // BUILD
+  // =============================================
 
   @override
   Widget build(BuildContext context) {
@@ -1745,7 +2360,7 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
                   const SizedBox(height: 20),
                   _buildImageGallery(),
                   const SizedBox(height: 24),
-                  _buildMainContent(), // Unified content management
+                  _buildMainContent(),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -1757,7 +2372,63 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
     );
   }
 
-  /// --- FIX: This logic now properly checks imageFiles.isEmpty ---
+  // =============================================
+  // HANDLE
+  // =============================================
+
+  Widget _buildHandle() => Container(
+    margin: const EdgeInsets.only(top: 12),
+    height: 4,
+    width: 40,
+    decoration: BoxDecoration(
+      color: Colors.grey[300],
+      borderRadius: BorderRadius.circular(10),
+    ),
+  );
+
+  // =============================================
+  // HEADER
+  // =============================================
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Seal Identifier",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  statusMessage,
+                  style: TextStyle(
+                    color: isUnmatched ? Colors.red : AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =============================================
+  // MAIN CONTENT
+  // =============================================
+
   Widget _buildMainContent() {
     if (isBusy || isInitializing) {
       return _buildLoadingState();
@@ -1773,50 +2444,86 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
 
     if (topPredictions.isNotEmpty) {
       return Column(
-        children: topPredictions.map((res) => _buildSelectableResult(res)).toList(),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Results header hint
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.touch_app_rounded,
+                    size: 15, color: Colors.indigo),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    "Tap a result to select it",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.indigo,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (selectedResult != null)
+                  GestureDetector(
+                    onTap: () => setState(() => selectedResult = null),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                        Border.all(color: Colors.red.withOpacity(0.2)),
+                      ),
+                      child: const Text(
+                        "Clear",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ...topPredictions.map((res) => _buildSelectableResult(res)),
+        ],
       );
     }
 
-    // Default "waiting for analysis" state after images are added
+    // Default: images added, waiting for analysis
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.1))
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
       ),
       child: Column(
         children: [
-          Icon(Icons.insights_rounded, color: AppTheme.primary.withOpacity(0.5), size: 32),
+          Icon(Icons.insights_rounded,
+              color: AppTheme.primary.withOpacity(0.5), size: 32),
           const SizedBox(height: 12),
           const Text(
             "Tap 'RUN ANALYSIS' to identify the seal profile",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.blueGrey),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.blueGrey,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Seal Identifier", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(statusMessage, style: TextStyle(color: isUnmatched ? Colors.red : AppTheme.primary, fontWeight: FontWeight.w600, fontSize: 13)),
-            ],
-          ),
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.grey)),
-        ],
-      ),
-    );
-  }
+  // =============================================
+  // LOADING STATE
+  // =============================================
 
   Widget _buildLoadingState() {
     return Column(
@@ -1824,191 +2531,373 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
         const SizedBox(height: 60),
         const CircularProgressIndicator(strokeWidth: 3),
         const SizedBox(height: 20),
-        Text("AI is processing images...", style: TextStyle(color: Colors.grey[600])),
+        Text(
+          statusMessage,
+          style: TextStyle(color: Colors.grey[600]),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
 
+  // =============================================
+  // EMPTY STATE
+  // =============================================
+
   Widget _buildEmptyState() {
     return Container(
       padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey[200]!)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
       child: Column(
         children: [
           Icon(Icons.photo_library_outlined, size: 48, color: Colors.grey[300]),
           const SizedBox(height: 12),
-          const Text("No profile photos yet", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+          const Text(
+            "No profile photos yet",
+            style: TextStyle(
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Use Camera or Gallery below to add images",
+            style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 
+  // =============================================
+  // SELECTABLE RESULT TILE
+  // =============================================
+
   Widget _buildSelectableResult(PredictionResult res) {
-    bool isSelected = selectedResult?.label == res.label;
-    double percent = res.confidence * 100;
+    final bool isSelected = selectedResult?.label == res.label;
+    final double percent = res.confidence * 100;
 
     return GestureDetector(
-      onTap: () => setState(() => selectedResult = res),
+      onTap: () {
+        setState(() {
+          // Toggle: deselect if already selected
+          if (isSelected) {
+            selectedResult = null;
+          } else {
+            selectedResult = res;
+          }
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primary.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppTheme.primary : Colors.grey[200]!, width: isSelected ? 2 : 1),
-          boxShadow: isSelected ? [BoxShadow(color: AppTheme.primary.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))] : [],
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : Colors.grey[200]!,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: AppTheme.primary.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ]
+              : [],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
+              // Icon badge
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: isSelected ? AppTheme.primary : Colors.grey[100], shape: BoxShape.circle),
-                child: Icon(isSelected ? Icons.check : Icons.fingerprint, color: isSelected ? Colors.white : Colors.grey, size: 20),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.primary : Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isSelected ? Icons.check : Icons.fingerprint,
+                  color: isSelected ? Colors.white : Colors.grey,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 16),
+
+              // Label + progress
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(res.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      res.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: isSelected ? AppTheme.primary : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: res.confidence,
+                        backgroundColor: Colors.grey[200],
+                        color: isSelected ? AppTheme.primary : Colors.blueGrey,
+                        minHeight: 5,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    LinearProgressIndicator(value: res.confidence, backgroundColor: Colors.grey[200], color: isSelected ? AppTheme.primary : Colors.blueGrey, minHeight: 4),
+                    if (isSelected)
+                      Text(
+                        "✓ Selected",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              Text("${percent.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, color: isSelected ? AppTheme.primary : Colors.grey[600])),
+
+              // Confidence %
+              Text(
+                "${percent.toStringAsFixed(1)}%",
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: isSelected ? AppTheme.primary : Colors.grey[600],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  // =============================================
+  // IMAGE GALLERY
+  // =============================================
 
   Widget _buildImageGallery() {
     if (imageFiles.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 120,
-      // child: ListView.builder(
-      //   scrollDirection: Axis.horizontal,
-      //   itemCount: imageFiles.length,
-      //   itemBuilder: (context, index) => Container(
-      //     width: 110,
-      //     margin: const EdgeInsets.only(right: 12),
-      //     child: Stack(
-      //       children: [
-      //         Positioned.fill(
-      //           child: ClipRRect(
-      //             borderRadius: BorderRadius.circular(16),
-      //             child: Image.file(imageFiles[index], fit: BoxFit.cover),
-      //           ),
-      //         ),
-      //         Positioned(
-      //           top: 5, right: 5,
-      //           child: GestureDetector(
-      //             onTap: () => setState(() => imageFiles.removeAt(index)),
-      //             child: Container(
-      //               padding: const EdgeInsets.all(4),
-      //               decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-      //               child: const Icon(Icons.close, size: 14, color: Colors.white),
-      //             ),
-      //           ),
-      //         ),
-      //       ],
-      //     ),
-      //   ),
-      // ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: imageFiles.length,
-        itemBuilder: (context, index) => Container(
-          width: 110,
-          margin: const EdgeInsets.only(right: 12),
-          child: Stack(
-            children: [
-              // 1. THE IMAGE PREVIEWER
-              Positioned.fill(
-                child: ImagePreviewer(
-                  file: imageFiles[index],
-                  galleryItems: imageFiles, // Enables swiping through all picked files
-                  initialIndex: index,
-                  width: 110,
-                  height: 110,
-                  fit: BoxFit.cover,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
 
-              // 2. THE DELETE BUTTON (Kept on top of the previewer)
-              Positioned(
-                top: 8, // Slightly adjusted for better alignment with the new radius
-                right: 8,
-                child: GestureDetector(
-                  onTap: () => setState(() => imageFiles.removeAt(index)),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.close, size: 14, color: Colors.white),
-                  ),
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "${imageFiles.length} Profile${imageFiles.length > 1 ? 's' : ''} Added",
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
               ),
-            ],
+            ),
+            Text(
+              "Tap to preview",
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: imageFiles.length,
+            itemBuilder: (context, index) {
+              return Container(
+                width: 110,
+                margin: EdgeInsets.only(
+                  right: 12,
+                  left: index == 0 ? 2 : 0,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Image with gallery preview
+                    ImagePreviewer(
+                      file: imageFiles[index],
+                      galleryItems: imageFiles,
+                      initialIndex: index,
+                      width: 110,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+
+                    // Gradient overlay
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.45),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Index badge
+                    Positioned(
+                      bottom: 6,
+                      left: 8,
+                      child: Text(
+                        "#${index + 1}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+
+                    // Delete button
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => _removeImage(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
-      ),
+      ],
     );
   }
+
+  // =============================================
+  // BOTTOM ACTIONS
+  // =============================================
 
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (imageFiles.length < maxImageLimit && !isBusy)
-            Row(children: [
-              Expanded(
-                child: _actionButton(
-                  icon: Icons.camera_alt_rounded,
-                  label: "Camera",
-                  onPressed: () => addImage(ImageSource.camera),
-                  isPrimary: false,
+          // Camera & Gallery buttons — always visible when not busy
+          if (!isBusy && !isInitializing)
+            Row(
+              children: [
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.camera_alt_rounded,
+                    label: "Camera",
+                    onPressed: () => _addImage(ImageSource.camera),
+                    isPrimary: false,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionButton(
-                  icon: Icons.photo_library_rounded,
-                  label: "Gallery",
-                  onPressed: () => addImage(ImageSource.gallery),
-                  isPrimary: false,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.photo_library_rounded,
+                    label: "Gallery",
+                    onPressed: () => _addImage(ImageSource.gallery),
+                    isPrimary: false,
+                  ),
                 ),
-              ),
-            ]),
-          const SizedBox(height: 12),
-          if (imageFiles.isNotEmpty)
+              ],
+            ),
+
+          if (imageFiles.isNotEmpty && !isBusy && !isInitializing) ...[
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: _actionButton(
-                icon: selectedResult != null ? Icons.verified_user_rounded : Icons.analytics_rounded,
-                label: selectedResult != null ? "CONFIRM SELECTION" : "RUN ANALYSIS",
-                onPressed: selectedResult != null ? _confirmSelection : _runInference,
+                icon: selectedResult != null
+                    ? Icons.verified_user_rounded
+                    : Icons.analytics_rounded,
+                label: selectedResult != null
+                    ? "CONFIRM SELECTION"
+                    : "RUN ANALYSIS",
+                onPressed:
+                selectedResult != null ? _confirmSelection : _runInference,
                 isPrimary: true,
-                color: selectedResult != null ? Colors.green[600] : AppTheme.primary,
+                color: selectedResult != null
+                    ? Colors.green[600]
+                    : AppTheme.primary,
               ),
             ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _actionButton({required IconData icon, required String label, required VoidCallback onPressed, bool isPrimary = true, Color? color}) {
+  // =============================================
+  // ACTION BUTTON HELPER
+  // =============================================
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    bool isPrimary = true,
+    Color? color,
+  }) {
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 18),
@@ -2023,21 +2912,52 @@ class _SealDetectionComponentState extends State<SealDetectionComponent> {
     );
   }
 
+  // =============================================
+  // ERROR CARD
+  // =============================================
+
   Widget _buildErrorCard() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.red[100]!)),
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.red[100]!),
+      ),
       child: Column(
         children: [
           const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
           const SizedBox(height: 12),
-          const Text("No Reliable Match", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)),
+          const Text(
+            "No Reliable Match",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.red,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text("The AI couldn't find a strong match. Try different angles or lighting.", textAlign: TextAlign.center, style: TextStyle(color: Colors.red[900], fontSize: 12)),
+          Text(
+            "The AI couldn't find a strong match. Try different angles or lighting.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.red[900], fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _addImage(ImageSource.camera),
+            icon: const Icon(Icons.add_a_photo, size: 16),
+            label: const Text("Add More Images"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red[700],
+              side: BorderSide(color: Colors.red.withOpacity(0.3)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildHandle() => Container(margin: const EdgeInsets.only(top: 12), height: 4, width: 40, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)));
 }

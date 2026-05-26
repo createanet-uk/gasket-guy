@@ -4256,6 +4256,7 @@ import 'edit_asset_page.dart';
 class LocalAssetEntry {
   String? fridgeId; // Populated by Edge Function in AddAssetPage
   String area = '';
+  String ggNumber = '';
   File? dataPlateImage;
   File? sealImage;
   String manufacturer = '';
@@ -4294,6 +4295,7 @@ class LocalAssetEntry {
     return {
       'fridgeId': fridgeId,
       'area': area,
+      'ggNumber': ggNumber,
       'dataPlateImagePath': dataPlateImage?.path,
       'sealImagePath': sealImage?.path,
       'manufacturer': manufacturer,
@@ -4328,6 +4330,7 @@ class LocalAssetEntry {
     var entry = LocalAssetEntry()
       ..fridgeId = json['fridgeId']
       ..area = json['area'] ?? ''
+      ..ggNumber = json['ggNumber'] ?? ''
       ..dataPlateImage = json['dataPlateImagePath'] != null ? File(json['dataPlateImagePath']) : null
       ..sealImage = json['sealImagePath'] != null ? File(json['sealImagePath']) : null
       ..manufacturer = json['manufacturer'] ?? ''
@@ -5052,6 +5055,8 @@ class _NewReportPageState extends State<NewReportPage> {
   }) async {
     const String bucketName = 'engineer-uploads';
 
+    final String baselineGgNumber = assets.isNotEmpty ? assets.first.ggNumber.trim().toUpperCase() : '';
+
     // 1. INSERT REPORT HEADER
     final reportHeader = await _supabase.from('asset_reports').insert({
       'customer_id': customerId,
@@ -5059,6 +5064,7 @@ class _NewReportPageState extends State<NewReportPage> {
       'report_title': title,
       'notes': notes,
       'status': 'submitted',
+      'gg_number': baselineGgNumber,
     }).select().single();
 
     final String reportId = reportHeader['id'];
