@@ -3281,24 +3281,7 @@ class _ViewReportPageState extends State<ViewReportPage> {
             ],
           ),
 
-          // ✅ ADDED: GG NUMBER COMPULSORY IDENTIFIER METADATA STRIP
-          if (_report!['gg_number'] != null && _report!['gg_number'].toString().isNotEmpty) ...[
-            const Divider(height: 30),
-            const Text("GG IDENTIFICATION NUMBER", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-              ),
-              child: Text(
-                  _report!['gg_number'].toString().toUpperCase(),
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8)
-              ),
-            ),
-          ],
+
           if (_report!['notes'] != null &&
               _report!['notes'].toString().isNotEmpty) ...[
             const Divider(height: 30),
@@ -3333,6 +3316,8 @@ class _ViewReportPageState extends State<ViewReportPage> {
     final bool isNetworkImage = dataPlatePath != null &&
         (dataPlatePath.startsWith('http://') ||
             dataPlatePath.startsWith('https://'));
+
+    final String assetGgNumber = (fridge['gg_number'] ?? 'N/A').toString();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -3383,6 +3368,9 @@ class _ViewReportPageState extends State<ViewReportPage> {
                           color: Colors.grey,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      // ✅ ADDED INLINE INSIDE CARD HEADER: Show dynamic row tags seamlessly
+                      Text("GG Number: $assetGgNumber", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary)),
                     ],
                   ),
                 ),
@@ -3483,12 +3471,21 @@ class _ViewReportPageState extends State<ViewReportPage> {
     widthVal > 0 ? "${widthVal.toStringAsFixed(1)}" : "N/A";
 
     Color wearColor;
-    if (wear < 30) {
+    if (wear < 34) {
       wearColor = AppTheme.success;
-    } else if (wear < 70) {
+    } else if (wear < 67) {
       wearColor = AppTheme.tertiary;
     } else {
       wearColor = AppTheme.error;
+    }
+
+    String wearStatus;
+    if (wear <= 33) {
+      wearStatus = "OK";
+    } else if (wear <= 66) {
+      wearStatus = "SPLIT";
+    } else {
+      wearStatus = "NEED REPLACEMENT";
     }
 
     return Container(
@@ -3587,13 +3584,29 @@ class _ViewReportPageState extends State<ViewReportPage> {
                           color: wearColor.withOpacity(0.3),
                         ),
                       ),
+                      // child: Row(
+                      //   children: [
+                      //     Icon(Icons.speed_rounded,
+                      //         size: 14, color: wearColor),
+                      //     const SizedBox(width: 4),
+                      //     Text(
+                      //       "$wear% WEAR",
+                      //       style: TextStyle(
+                      //         fontSize: 11,
+                      //         fontWeight: FontWeight.bold,
+                      //         color: wearColor,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+
                       child: Row(
                         children: [
-                          Icon(Icons.speed_rounded,
-                              size: 14, color: wearColor),
+                          Icon(Icons.speed_rounded, size: 14, color: wearColor),
                           const SizedBox(width: 4),
                           Text(
-                            "$wear% WEAR",
+                            // ✅ UPDATED: Status string dynamically appended along with the raw % wear label
+                            "$wearStatus ($wear% WEAR)",
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

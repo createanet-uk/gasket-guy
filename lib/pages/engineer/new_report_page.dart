@@ -5055,8 +5055,6 @@ class _NewReportPageState extends State<NewReportPage> {
   }) async {
     const String bucketName = 'engineer-uploads';
 
-    final String baselineGgNumber = assets.isNotEmpty ? assets.first.ggNumber.trim().toUpperCase() : '';
-
     // 1. INSERT REPORT HEADER
     final reportHeader = await _supabase.from('asset_reports').insert({
       'customer_id': customerId,
@@ -5064,7 +5062,7 @@ class _NewReportPageState extends State<NewReportPage> {
       'report_title': title,
       'notes': notes,
       'status': 'submitted',
-      'gg_number': baselineGgNumber,
+
     }).select().single();
 
     final String reportId = reportHeader['id'];
@@ -5248,6 +5246,7 @@ class _NewReportPageState extends State<NewReportPage> {
         'drawer_count': asset.drawerCount,
         'seals_are_common': asset.sealsAreCommon,
         'engineer_notes': asset.description,
+        'gg_number': asset.ggNumber.trim().toUpperCase(),
       }).select().single();
 
       final String assetId = assetResponse['id'];
@@ -5689,9 +5688,21 @@ class _NewReportPageState extends State<NewReportPage> {
 
   Widget _buildSealSummaryRow(IndividualSeal s) {
     Color wearColor;
-    if (s.wearPercentage < 30) wearColor = AppTheme.success;
-    else if (s.wearPercentage < 70) wearColor = AppTheme.tertiary;
-    else wearColor = AppTheme.error;
+    String statusLabel;
+    // if (s.wearPercentage < 34) wearColor = AppTheme.success;
+    // else if (s.wearPercentage < 67) wearColor = AppTheme.tertiary;
+    // else wearColor = AppTheme.error;
+
+    if (s.wearPercentage <= 33.0) {
+      statusLabel = "OK";
+      wearColor = AppTheme.success;
+    } else if (s.wearPercentage <= 66.0) {
+      statusLabel = "Split";
+      wearColor = Colors.orange;
+    } else {
+      statusLabel = "Need Replacement";
+      wearColor = AppTheme.error;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -5738,7 +5749,8 @@ class _NewReportPageState extends State<NewReportPage> {
             children: [
               _dataPoint(Icons.straighten, "${s.doorHeight}x${s.doorWidth} mm"),
               const SizedBox(width: 12),
-              _dataPoint(Icons.speed, "Wear: ${s.wearPercentage.toInt()}%"),
+              // _dataPoint(Icons.speed, "Wear: ${s.wearPercentage.toInt()}%"),
+              _dataPoint(Icons.speed, "Status: $statusLabel (${s.wearPercentage.toInt()}%)"),
               const SizedBox(width: 12),
               Expanded(child: _dataPoint(Icons.qr_code, s.sealName ?? 'Not Linked')),
             ],

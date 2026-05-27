@@ -2959,10 +2959,10 @@ class _ReportListPageState extends State<ReportListPage> {
           .from('asset_reports')
           .select('''
           *,
-          gg_number,
           customer:user_profiles!customer_id(full_name, email),
           fridges:assets_report_fridge(
             *,
+            gg_number,
             seals:asset_report_fridge_items (*)
           )
         ''')
@@ -3541,19 +3541,7 @@ class _ReportListPageState extends State<ReportListPage> {
                               Text(customer, style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
                             ],
                           ),
-                          if (report['gg_number'] != null && report['gg_number'].toString().isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(Icons.tag_rounded, size: 14, color: AppTheme.primary.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Text(
-                                    "GG NO: ${report['gg_number']}",
-                                    style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)
-                                ),
-                              ],
-                            ),
-                          ],
+
                           const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3698,8 +3686,6 @@ class _ReportListPageState extends State<ReportListPage> {
   }) async {
     const String bucketName = 'engineer-uploads';
 
-    final String baselineGgNumber = assets.isNotEmpty ? assets.first.ggNumber.trim().toUpperCase() : '';
-
     // 1. INSERT REPORT HEADER
     final reportHeader = await _supabase.from('asset_reports').insert({
       'customer_id': customerId,
@@ -3707,7 +3693,6 @@ class _ReportListPageState extends State<ReportListPage> {
       'report_title': title,
       'notes': notes,
       'status': 'submitted',
-      'gg_number': baselineGgNumber,
     }).select().single();
 
     final String reportId = reportHeader['id'];
@@ -3837,6 +3822,7 @@ class _ReportListPageState extends State<ReportListPage> {
         'drawer_count': asset.drawerCount,
         'seals_are_common': asset.sealsAreCommon,
         'engineer_notes': asset.description,
+        'gg_number': asset.ggNumber.trim().toUpperCase(),
       }).select().single();
 
       // 3. INSERT INTO 'assets_report_fridge'

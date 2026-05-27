@@ -6250,6 +6250,25 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                   const SizedBox(height: 12),
 
                   // ✅ NEW: GG NUMBER TEXTFORMFIELD MOUNTED INLINE WITH VALIDATION
+                  // TextFormField(
+                  //   controller: _ggNumberController,
+                  //   keyboardType: TextInputType.text,
+                  //   textCapitalization: TextCapitalization.characters,
+                  //   decoration: const InputDecoration(
+                  //     labelText: "GG Number *",
+                  //     hintText: "Enter asset GG identification number",
+                  //     border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                  //     errorStyle: TextStyle(fontWeight: FontWeight.bold),
+                  //   ),
+                  //   onChanged: (val) => _entry.ggNumber = val.trim().toUpperCase(),
+                  //   validator: (value) {
+                  //     if (value == null || value.trim().isEmpty) {
+                  //       return "GG Number is compulsory for record compliance.";
+                  //     }
+                  //     return null;
+                  //   },
+                  // ),
+
                   TextFormField(
                     controller: _ggNumberController,
                     keyboardType: TextInputType.text,
@@ -6257,10 +6276,14 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                     decoration: const InputDecoration(
                       labelText: "GG Number *",
                       hintText: "Enter asset GG identification number",
+                      // ✅ ADDED: Fixed prefix text tracking signature
+                      prefixText: "GG ",
+                      prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                       border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                       errorStyle: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    onChanged: (val) => _entry.ggNumber = val.trim().toUpperCase(),
+                    // ✅ ENRICHED: Automatically appends the visual "GG " text block into model property maps on save
+                    onChanged: (val) => _entry.ggNumber = "GG ${val.trim().toUpperCase()}",
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return "GG Number is compulsory for record compliance.";
@@ -6658,7 +6681,8 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
                         // Update parent configuration headers
                         _entry.area = _locationController.text.trim();
-                        _entry.ggNumber = _ggNumberController.text.trim().toUpperCase();
+                        final String rawGg = _ggNumberController.text.trim().toUpperCase();
+                        _entry.ggNumber = rawGg.startsWith('GG ') ? rawGg : 'GG $rawGg';
                         _entry.modelNo = _modelController.text;
                         _entry.serialNo = _serialController.text;
                         _entry.brand = _brandController.text;
@@ -6747,17 +6771,22 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
     String wearStatus;
     Color wearColor;
-    if (item.wearPercentage < 30) {
-      wearStatus = "Excellent Condition";
+    if (item.wearPercentage < 34) {
+      // wearStatus = "Excellent Condition";
+      wearStatus = "Ok";
+
       wearColor = AppTheme.success;
-    } else if (item.wearPercentage < 70) {
-      wearStatus = "Fair Condition";
+    } else if (item.wearPercentage < 67) {
+      wearStatus = "Split";
       wearColor = AppTheme.tertiary;
-    } else if (item.wearPercentage < 90) {
-      wearStatus = "Heavy Wear";
-      wearColor = Colors.orange;
-    } else {
-      wearStatus = "REPLACE URGENTLY";
+    }
+    // else if (item.wearPercentage < 90) {
+    //   wearStatus = "Heavy Wear";
+    //   wearColor = Colors.orange;
+    // }
+    else {
+      // wearStatus = "REPLACE URGENTLY";
+      wearStatus = "Need Replacement";
       wearColor = AppTheme.error;
     }
 
@@ -7012,7 +7041,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                 onChanged: (val) {
                   setState(() {
                     item.wearPercentage = val;
-                    item.needsUrgentReplacement = (val >= 90);
+                    item.needsUrgentReplacement = (val >= 67);
                   });
                 },
               ),
@@ -7599,7 +7628,12 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
 
       // Update text controllers for main fields cleanly
       _locationController.text = _entry.area;
-      _ggNumberController.text = _entry.ggNumber;
+      // ✅ FIXED: Strips "GG " out visually for crisp form field input editing metrics
+      if (_entry.ggNumber.startsWith('GG ')) {
+        _ggNumberController.text = _entry.ggNumber.replaceFirst('GG ', '');
+      } else {
+        _ggNumberController.text = _entry.ggNumber;
+      }
       _brandController.text = _entry.brand ?? '';
       _modelController.text = _entry.modelNo;
       _serialController.text = _entry.serialNo;
