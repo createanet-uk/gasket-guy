@@ -4378,8 +4378,9 @@ class IndividualSeal {
   // --- NEW FIELDS ---
   double doorHeight = 0.0;
   double doorWidth = 0.0;
-  double wearPercentage = 0.0; // Slider value 0-100
+  double wearPercentage = 0.0;
   bool needsUrgentReplacement = false;
+  bool isDartToDart = false;
 
   // Variant Fields
   bool isMagnetic = false;
@@ -4400,7 +4401,6 @@ class IndividualSeal {
   IndividualSeal({required this.itemName}) {
     ctrls = {
       'type': TextEditingController(),
-      'material': TextEditingController(),
       'hardness': TextEditingController(),
       'inner': TextEditingController(),
       'outer': TextEditingController(),
@@ -4427,6 +4427,7 @@ class IndividualSeal {
       'doorWidth': doorWidth,
       'wearPercentage': wearPercentage,
       'needsUrgentReplacement': needsUrgentReplacement,
+      'isDartToDart': isDartToDart,
       'isMagnetic': isMagnetic,
       'sealType': sealType,
       'material': material,
@@ -4452,6 +4453,7 @@ class IndividualSeal {
       ..doorWidth = (json['doorWidth'] ?? 0.0).toDouble()
       ..wearPercentage = (json['wearPercentage'] ?? 0.0).toDouble()
       ..needsUrgentReplacement = json['needsUrgentReplacement'] ?? false
+      ..isDartToDart = json['isDartToDart'] ?? false
       ..isMagnetic = json['isMagnetic'] ?? false
       ..sealType = json['sealType']
       ..material = json['material']
@@ -4474,7 +4476,6 @@ class IndividualSeal {
 
   void updateControllers() {
     ctrls['type']!.text = sealType ?? '';
-    ctrls['material']!.text = material ?? '';
     ctrls['hardness']!.text = hardness ?? '';
     ctrls['inner']!.text = innerDiameter.toString();
     ctrls['outer']!.text = outerDiameter.toString();

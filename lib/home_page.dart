@@ -2617,7 +2617,8 @@ import 'package:mobile/theme.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:tflite_flutter/tflite_flutter.dart'
+    if (dart.library.html) 'package:mobile/utils/tflite_web_stub.dart';
 import 'package:image/image.dart' as img;
 
 import 'package:mobile/vision/rubber_camera_detector.dart';

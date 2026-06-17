@@ -5837,7 +5837,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:tflite_flutter/tflite_flutter.dart'
+    if (dart.library.html) 'package:mobile/utils/tflite_web_stub.dart';
 import 'package:image/image.dart' as img;
 
 // ─────────────────────────────────────────────────────────────

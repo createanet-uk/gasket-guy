@@ -3842,6 +3842,7 @@
             item.sealId = product['id'].toString();
             item.sealName = product['title'];
             item.isMagnetic = product['is_magnetic'] ?? false;
+            item.isDartToDart = product['is_dart_to_dart'] ?? false;
             item.sealType = product['seal_type'] ?? '';
             item.material = product['material'] ?? '';
             item.hardness = product['hardness'] ?? '';
@@ -4192,6 +4193,32 @@
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => setState(() => item.isDartToDart = !item.isDartToDart),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      height: 24, width: 24,
+                      child: Checkbox(
+                        value: item.isDartToDart,
+                        activeColor: AppTheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        onChanged: (val) => setState(() => item.isDartToDart = val ?? false),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "DART TO DART MEASUREMENT",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: item.isDartToDart ? AppTheme.primary : AppTheme.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               const Divider(height: 32),
 
@@ -4317,6 +4344,21 @@
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              Text("ITEM NOTES", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: item.ctrls['desc'],
+                maxLines: 3,
+                onChanged: (val) => item.description = val,
+                decoration: InputDecoration(
+                  hintText: "Add notes about this seal...",
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                style: const TextStyle(fontSize: 13),
               ),
             ],
           ),
@@ -4716,6 +4758,7 @@
             ..doorWidth = originalSeal.doorWidth
             ..wearPercentage = originalSeal.wearPercentage
             ..needsUrgentReplacement = originalSeal.needsUrgentReplacement
+            ..isDartToDart = originalSeal.isDartToDart
             ..isMagnetic = originalSeal.isMagnetic
             ..sealType = originalSeal.sealType
             ..material = originalSeal.material
@@ -4946,7 +4989,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
       item.sealId = p['id'].toString();
       item.sealName = p['title'] ?? '';
       item.sealType = p['seal_type'] ?? '';
-      item.material = p['material'] ?? '';
       item.hardness = p['hardness'] ?? '';
       item.innerDiameter = (p['inner_diameter'] ?? 0).toDouble();
       item.outerDiameter = (p['outer_diameter'] ?? 0).toDouble();
@@ -5320,7 +5362,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _buildInlineMetaSpec("Material Element", sealProduct['material'] ?? '—')),
                           Expanded(child: _buildInlineMetaSpec("Extrusion Type", sealProduct['seal_type'] ?? '—')),
                         ],
                       ),
@@ -5513,7 +5554,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
             item.sealId = p['id'].toString();
             item.sealName = p['title'];
             item.sealType = p['seal_type'] ?? '';
-            item.material = p['material'] ?? '';
             item.hardness = p['hardness'] ?? '';
             item.innerDiameter = (p['inner_diameter'] ?? 0).toDouble();
             item.outerDiameter = (p['outer_diameter'] ?? 0).toDouble();
@@ -5979,13 +6019,11 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
   /// ✅ Helper to initialize a pristine new component element with empty form field parameters
   void _initializePristineSeal(IndividualSeal seal) {
     seal.sealType = '';
-    seal.material = '';
     seal.sealModelNumber = '';
     seal.doorHeight = 0.0;
     seal.doorWidth = 0.0;
 
     seal.ctrls['type']!.clear();
-    seal.ctrls['material']!.clear();
     seal.ctrls['modelNum']!.clear();
     seal.ctrls['height']!.clear();
     seal.ctrls['width']!.clear();
@@ -6163,8 +6201,8 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
           item.sealId = product['id'].toString();
           item.sealName = product['title'];
           item.isMagnetic = product['is_magnetic'] ?? false;
+          item.isDartToDart = product['is_dart_to_dart'] ?? false;
           item.sealType = product['seal_type'] ?? '';
-          item.material = product['material'] ?? '';
           item.hardness = product['hardness'] ?? '';
           item.innerDiameter = (product['inner_diameter'] ?? 0).toDouble();
           item.outerDiameter = (product['outer_diameter'] ?? 0).toDouble();
@@ -6702,7 +6740,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                         // Parse sub-view field parameters into our model memory arrays
                         for (var seal in _entry.individualSeals) {
                           seal.sealType = seal.ctrls['type']!.text;
-                          seal.material = seal.ctrls['material']!.text;
                           seal.hardness = seal.ctrls['hardness']!.text;
                           seal.innerDiameter = double.tryParse(seal.ctrls['inner']!.text) ?? 0.0;
                           seal.outerDiameter = double.tryParse(seal.ctrls['outer']!.text) ?? 0.0;
@@ -6769,26 +6806,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
     final Color cardBackground = isDark ? AppTheme.cardBg : AppTheme.secondaryBackground;
     final Color innerContainerBg = isDark ? AppTheme.innerContainerBg : AppTheme.primaryBackground;
 
-    String wearStatus;
-    Color wearColor;
-    if (item.wearPercentage < 34) {
-      // wearStatus = "Excellent Condition";
-      wearStatus = "Ok";
-
-      wearColor = AppTheme.success;
-    } else if (item.wearPercentage < 67) {
-      wearStatus = "Split";
-      wearColor = AppTheme.tertiary;
-    }
-    // else if (item.wearPercentage < 90) {
-    //   wearStatus = "Heavy Wear";
-    //   wearColor = Colors.orange;
-    // }
-    else {
-      // wearStatus = "REPLACE URGENTLY";
-      wearStatus = "Need Replacement";
-      wearColor = AppTheme.error;
-    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -7020,62 +7037,65 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
             Divider(color: isDark ? AppTheme.darkBorder : AppTheme.alternate.withOpacity(0.5)),
             const SizedBox(height: 12),
 
+            Text("WEAR CONDITION", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
+            const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("WEAR ASSESSMENT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
-                Text("${item.wearPercentage.toInt()}%", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: wearColor)),
-              ],
-            ),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 4,
-                activeTrackColor: wearColor,
-                thumbColor: wearColor,
-                overlayColor: wearColor.withOpacity(0.2),
-              ),
-              child: Slider(
-                value: item.wearPercentage,
-                min: 0,
-                max: 100,
-                onChanged: (val) {
-                  setState(() {
-                    item.wearPercentage = val;
-                    item.needsUrgentReplacement = (val >= 67);
-                  });
-                },
-              ),
-            ),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(wearStatus, style: TextStyle(color: wearColor, fontSize: 11, fontWeight: FontWeight.bold)),
-
-                GestureDetector(
-                  onTap: () => setState(() => item.needsUrgentReplacement = !item.needsUrgentReplacement),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text("URGENT REPLACEMENT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: item.needsUrgentReplacement ? AppTheme.error : AppTheme.secondaryText)),
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        height: 24, width: 24,
-                        child: Checkbox(
-                          value: item.needsUrgentReplacement,
-                          activeColor: AppTheme.error,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                          onChanged: (val) {
-                            setState(() => item.needsUrgentReplacement = val ?? false);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                _wearChip(
+                  label: 'OK',
+                  color: AppTheme.success,
+                  isSelected: !item.needsUrgentReplacement,
+                  onTap: () => setState(() { item.wearPercentage = 10; item.needsUrgentReplacement = false; }),
+                ),
+                const SizedBox(width: 12),
+                _wearChip(
+                  label: 'SPLIT',
+                  color: AppTheme.error,
+                  isSelected: item.needsUrgentReplacement,
+                  onTap: () => setState(() { item.wearPercentage = 50; item.needsUrgentReplacement = true; }),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            Text("ITEM NOTES", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: item.ctrls['desc'],
+              maxLines: 3,
+              onChanged: (val) => item.description = val,
+              decoration: InputDecoration(
+                hintText: "Add notes about this seal...",
+                hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _wearChip({required String label, required Color color, required bool isSelected, required VoidCallback onTap}) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSelected ? color : Colors.grey[300]!, width: isSelected ? 2 : 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(isSelected ? Icons.check_circle_rounded : Icons.circle_outlined, size: 18, color: isSelected ? color : Colors.grey[400]),
+              const SizedBox(height: 4),
+              Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isSelected ? color : Colors.grey[500])),
+            ],
+          ),
         ),
       ),
     );
@@ -7189,7 +7209,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
           children: [
             Expanded(child: _buildInfoRow("Seal Name", item.sealName, isDark)),
             Expanded(child: _buildInfoRow("Seal Type", item.sealType, isDark)),
-            Expanded(child: _buildInfoRow("Material", item.material, isDark)),
           ],
         ),
         const SizedBox(height: 14),

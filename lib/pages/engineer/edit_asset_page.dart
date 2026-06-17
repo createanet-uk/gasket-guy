@@ -1,11 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../components/image_previewer.dart';
-import '../../components/seal_detection_component.dart';
 import '../../theme.dart';
 import 'new_report_page.dart';
 
@@ -169,6 +164,7 @@ class _EditAssetPageState extends State<EditAssetPage> with SingleTickerProvider
       item.sealId = p['id'].toString();
       item.sealName = p['title'] ?? '';
       item.sealType = p['seal_type'] ?? '';
+      item.isDartToDart = p['is_dart_to_dart'] ?? false;
       item.material = p['material'] ?? '';
       item.hardness = p['hardness'] ?? '';
       item.innerDiameter = (p['inner_diameter'] ?? 0).toDouble();
@@ -239,21 +235,6 @@ class _EditAssetPageState extends State<EditAssetPage> with SingleTickerProvider
     final Color cardBackground = isDark ? AppTheme.cardBg : AppTheme.secondaryBackground;
     final Color innerContainerBg = isDark ? AppTheme.innerContainerBg : AppTheme.primaryBackground;
 
-    String wearStatus;
-    Color wearColor;
-    if (item.wearPercentage < 30) {
-      wearStatus = "Excellent Condition";
-      wearColor = AppTheme.success;
-    } else if (item.wearPercentage < 70) {
-      wearStatus = "Fair Condition";
-      wearColor = AppTheme.tertiary;
-    } else if (item.wearPercentage < 90) {
-      wearStatus = "Heavy Wear";
-      wearColor = Colors.orange;
-    } else {
-      wearStatus = "REPLACE URGENTLY";
-      wearColor = AppTheme.error;
-    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -291,6 +272,28 @@ class _EditAssetPageState extends State<EditAssetPage> with SingleTickerProvider
                 Expanded(child: _buildSmallTextField(label: "DOOR WIDTH (mm)", controller: item.ctrls['width']!, isDark: isDark, onChanged: (val) => item.doorWidth = double.tryParse(val) ?? 0)),
               ],
             ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => setState(() => item.isDartToDart = !item.isDartToDart),
+              child: Row(
+                children: [
+                  SizedBox(
+                    height: 24, width: 24,
+                    child: Checkbox(
+                      value: item.isDartToDart,
+                      activeColor: AppTheme.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      onChanged: (val) => setState(() => item.isDartToDart = val ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "DART TO DART MEASUREMENT",
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: item.isDartToDart ? AppTheme.primary : AppTheme.secondaryText),
+                  ),
+                ],
+              ),
+            ),
             const Divider(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -312,46 +315,40 @@ class _EditAssetPageState extends State<EditAssetPage> with SingleTickerProvider
               ),
             ],
             const SizedBox(height: 16),
+            const Text("WEAR CONDITION", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("WEAR ASSESSMENT", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                Text("${item.wearPercentage.toInt()}%", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: wearColor)),
-              ],
-            ),
-            Slider(
-              value: item.wearPercentage,
-              min: 0, max: 100,
-              activeColor: wearColor,
-              inactiveColor: AppTheme.alternate,
-              onChanged: (val) {
-                setState(() {
-                  item.wearPercentage = val;
-                  item.needsUrgentReplacement = (val >= 90);
-                });
-              },
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(wearStatus, style: TextStyle(color: wearColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                GestureDetector(
-                  onTap: () => setState(() => item.needsUrgentReplacement = !item.needsUrgentReplacement),
-                  child: Row(
-                    children: [
-                      Text("URGENT REPLACEMENT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: item.needsUrgentReplacement ? AppTheme.error : AppTheme.secondaryText)),
-                      const SizedBox(width: 4),
-                      Checkbox(
-                        value: item.needsUrgentReplacement,
-                        activeColor: AppTheme.error,
-                        onChanged: (val) => setState(() => item.needsUrgentReplacement = val ?? false),
-                      ),
-                    ],
-                  ),
-                ),
+                _wearChip(label: 'OK', color: AppTheme.success, isSelected: !item.needsUrgentReplacement, onTap: () => setState(() { item.wearPercentage = 10; item.needsUrgentReplacement = false; })),
+                const SizedBox(width: 12),
+                _wearChip(label: 'SPLIT', color: AppTheme.error, isSelected: item.needsUrgentReplacement, onTap: () => setState(() { item.wearPercentage = 50; item.needsUrgentReplacement = true; })),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _wearChip({required String label, required Color color, required bool isSelected, required VoidCallback onTap}) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSelected ? color : Colors.grey[300]!, width: isSelected ? 2 : 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(isSelected ? Icons.check_circle_rounded : Icons.circle_outlined, size: 18, color: isSelected ? color : Colors.grey[400]),
+              const SizedBox(height: 4),
+              Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isSelected ? color : Colors.grey[500])),
+            ],
+          ),
         ),
       ),
     );

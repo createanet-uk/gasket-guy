@@ -2881,6 +2881,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../theme.dart';
 import '../../components/image_previewer.dart';
+import 'edit_report_page.dart';
 
 class ViewReportPage extends StatefulWidget {
   final String reportId;
@@ -2980,6 +2981,32 @@ class _ViewReportPageState extends State<ViewReportPage> {
       });
     } catch (e) {
       debugPrint("Error fetching details: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Force a live Supabase fetch — bypasses stale cache, used after editing.
+  Future<void> _fetchFromSupabase() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final onlineData = await _supabase.from('asset_reports').select('''
+          *,
+          gg_number,
+          customer:user_profiles!customer_id(full_name, email),
+          fridges:assets_report_fridge(
+            *,
+            seals:asset_report_fridge_items(*),
+            fridge:fridges(
+              *,
+              components:fridge_components(*)
+            )
+          )
+        ''').eq('id', widget.reportId).single();
+      final enriched = _mergeComponentDimensionsIntoSeals(onlineData);
+      if (mounted) setState(() { _report = enriched; _isLoading = false; });
+    } catch (e) {
+      debugPrint('Force refresh error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -3190,6 +3217,23 @@ class _ViewReportPageState extends State<ViewReportPage> {
       appBar: AppBar(
         title: Text(_report!['report_title'] ?? "Report Summary"),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            tooltip: 'Edit Report',
+            onPressed: () async {
+              final updated = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditReportPage(reportId: widget.reportId),
+                ),
+              );
+              if (updated == true && mounted) {
+                _fetchFromSupabase();
+              }
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
