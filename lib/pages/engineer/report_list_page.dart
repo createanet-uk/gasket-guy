@@ -3874,6 +3874,9 @@ class _ReportListPageState extends State<ReportListPage> {
           'outer_diameter': sealItem.outerDiameter,
           'wear_percentage': sealItem.wearPercentage.toInt(),
           'need_replacement': sealItem.needsUrgentReplacement,
+          'height_mm': sealItem.doorHeight > 0 ? sealItem.doorHeight : null,
+          'width_mm': sealItem.doorWidth > 0 ? sealItem.doorWidth : null,
+          'is_dart_to_dart': sealItem.isDartToDart,
         });
 
         // 6. UPSERT MASTER 'fridge_components'

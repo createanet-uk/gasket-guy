@@ -4193,31 +4193,25 @@
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () => setState(() => item.isDartToDart = !item.isDartToDart),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      height: 24, width: 24,
-                      child: Checkbox(
-                        value: item.isDartToDart,
-                        activeColor: AppTheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        onChanged: (val) => setState(() => item.isDartToDart = val ?? false),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "DART TO DART MEASUREMENT",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: item.isDartToDart ? AppTheme.primary : AppTheme.secondaryText,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 10),
+              Text("MEASURED", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  _wearChip(
+                    label: 'EDGE TO EDGE',
+                    color: AppTheme.primary,
+                    isSelected: !item.isDartToDart,
+                    onTap: () => setState(() => item.isDartToDart = false),
+                  ),
+                  const SizedBox(width: 8),
+                  _wearChip(
+                    label: 'DART TO DART',
+                    color: AppTheme.primary,
+                    isSelected: item.isDartToDart,
+                    onTap: () => setState(() => item.isDartToDart = true),
+                  ),
+                ],
               ),
 
               const Divider(height: 32),
@@ -6312,7 +6306,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                     keyboardType: TextInputType.text,
                     textCapitalization: TextCapitalization.characters,
                     decoration: const InputDecoration(
-                      labelText: "GG Number *",
+                      labelText: "GGID *",
                       hintText: "Enter asset GG identification number",
                       // ✅ ADDED: Fixed prefix text tracking signature
                       prefixText: "GG ",
@@ -6324,7 +6318,7 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                     onChanged: (val) => _entry.ggNumber = "GG ${val.trim().toUpperCase()}",
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return "GG Number is compulsory for record compliance.";
+                        return "GGID is compulsory for record compliance.";
                       }
                       return null;
                     },
@@ -6967,6 +6961,27 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                       return null;
                     },
                   ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            Text("MEASURED", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkSecondaryText : AppTheme.secondaryText)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _wearChip(
+                  label: 'EDGE TO EDGE',
+                  color: AppTheme.primary,
+                  isSelected: !item.isDartToDart,
+                  onTap: () => setState(() => item.isDartToDart = false),
+                ),
+                const SizedBox(width: 8),
+                _wearChip(
+                  label: 'DART TO DART',
+                  color: AppTheme.primary,
+                  isSelected: item.isDartToDart,
+                  onTap: () => setState(() => item.isDartToDart = true),
                 ),
               ],
             ),

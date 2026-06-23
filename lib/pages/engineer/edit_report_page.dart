@@ -807,26 +807,24 @@ class _EditReportPageState extends State<EditReportPage> {
             ],
           ),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => setState(() => seal.isDartToDart = !seal.isDartToDart),
-            child: Row(
-              children: [
-                SizedBox(
-                  height: 24, width: 24,
-                  child: Checkbox(
-                    value: seal.isDartToDart,
-                    activeColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    onChanged: (val) => setState(() => seal.isDartToDart = val ?? false),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'DART TO DART MEASUREMENT',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: seal.isDartToDart ? AppTheme.primary : AppTheme.secondaryText),
-                ),
-              ],
-            ),
+          const Text('MEASURED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.secondaryText)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _wearChip(
+                label: 'EDGE TO EDGE',
+                color: AppTheme.primary,
+                isSelected: !seal.isDartToDart,
+                onTap: () => setState(() => seal.isDartToDart = false),
+              ),
+              const SizedBox(width: 8),
+              _wearChip(
+                label: 'DART TO DART',
+                color: AppTheme.primary,
+                isSelected: seal.isDartToDart,
+                onTap: () => setState(() => seal.isDartToDart = true),
+              ),
+            ],
           ),
 
           const SizedBox(height: 16),
