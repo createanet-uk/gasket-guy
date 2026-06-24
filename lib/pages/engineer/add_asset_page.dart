@@ -6759,18 +6759,6 @@ class _AddAssetPageState extends State<AddAssetPage> with SingleTickerProviderSt
                             return;
                           }
 
-                          // ✅ VALIDATION C: Enforce custom lower-bound evaluation metric limit check (Wear must be >= 5%)
-                          if (seal.wearPercentage < 5.0) {
-                            ScaffoldMessenger.of(context).clearSnackBars();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Validation Error: Please perform wear assessment on ${seal.itemName}. Minimum allowed value is 5%."),
-                                backgroundColor: AppTheme.error,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return; // Blocks the pipeline from continuing or hitting pop()
-                          }
                         }
 
                         // If all custom data validation rules pass cleanly, save to parent report and dismiss route

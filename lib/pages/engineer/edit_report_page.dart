@@ -281,15 +281,6 @@ class _EditReportPageState extends State<EditReportPage> {
           'engineer_notes': fridge.engineerNotesCtrl.text.trim(),
         }).eq('id', fridge.arfId);
 
-        // Also keep the master fridges record in sync if we have its ID
-        if (fridge.fridgeId != null) {
-          await _supabase.from('fridges').update({
-            'manufacturer': fridge.manufacturerCtrl.text.trim(),
-            'model_no': fridge.modelCtrl.text.trim(),
-            'serial_no': fridge.serialCtrl.text.trim(),
-          }).eq('id', fridge.fridgeId!);
-        }
-
         // 3. Update each seal item
         for (int i = 0; i < fridge.seals.length; i++) {
           final seal = fridge.seals[i];
@@ -303,25 +294,10 @@ class _EditReportPageState extends State<EditReportPage> {
             'wear_percentage': seal.wearPercentage.toInt(),
             'need_replacement': seal.needsUrgentReplacement,
             'item_notes': seal.notesCtrl.text.trim(),
+            'height_mm': height > 0 ? height : null,
+            'width_mm': width > 0 ? width : null,
+            'is_dart_to_dart': seal.isDartToDart,
           }).eq('id', seal.itemId);
-
-          // Update fridge_components dimensions if we have the fridge ID
-          if (fridge.fridgeId != null && (height > 0 || width > 0)) {
-            final existing = await _supabase
-                .from('fridge_components')
-                .select('id')
-                .eq('fridge_id', fridge.fridgeId!)
-                .eq('component_index', i + 1)
-                .limit(1)
-                .maybeSingle();
-
-            if (existing != null) {
-              await _supabase.from('fridge_components').update({
-                'height_mm': height > 0 ? height : null,
-                'width_mm': width > 0 ? width : null,
-              }).eq('id', existing['id']);
-            }
-          }
         }
       }
 

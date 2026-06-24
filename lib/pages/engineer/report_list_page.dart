@@ -3780,8 +3780,8 @@ class _ReportListPageState extends State<ReportListPage> {
           }).eq('id', targetFridgeId!);
           debugPrint("🔄 Existing master fridge matched and updated successfully: $targetFridgeId");
         } else {
-          // Safe pristine insert routine with fallback validation mapping
-          final newFridgeRecord = await _supabase.from('fridges').insert({
+          // Upsert to handle race conditions when two engineers submit the same fridge concurrently
+          final newFridgeRecord = await _supabase.from('fridges').upsert({
             'manufacturer': safeBrand,
             'brand': safeBrand,
             'model_no': safeModel,
@@ -3790,11 +3790,23 @@ class _ReportListPageState extends State<ReportListPage> {
             'drawer_count': asset.drawerCount,
             'created_by': _supabase.auth.currentUser!.id,
             'data_plate_image_url': dataPlateUrl,
-          }).select('id').maybeSingle();
+          }, onConflict: 'manufacturer,model_no,serial_no').select('id').maybeSingle();
 
-          // Null-coalescing guard fallback path configuration
-          targetFridgeId = newFridgeRecord?['id']?.toString();
-          debugPrint("🆕 No match found. Created a fresh master fridge row: $targetFridgeId");
+          if (newFridgeRecord == null) {
+            // Row existed (conflict was ignored) — fetch the existing ID
+            final existing = await _supabase
+                .from('fridges')
+                .select('id')
+                .eq('manufacturer', safeBrand)
+                .eq('model_no', safeModel)
+                .eq('serial_no', safeSerial)
+                .limit(1)
+                .maybeSingle();
+            targetFridgeId = existing?['id']?.toString();
+          } else {
+            targetFridgeId = newFridgeRecord['id']?.toString();
+          }
+          debugPrint("🆕 Fridge upserted. targetFridgeId: $targetFridgeId");
         }
       } else {
         // Direct explicit template override update update call
